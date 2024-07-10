@@ -110,7 +110,7 @@ function drawHealth(ctx, player) {
     ctx.fillText(`Health: ${player.health}`, 10, 30);
 }
 
-let socket = new WebSocket('wss://ваш-ngrok-домен');
+let socket = new WebSocket('wss://8305-212-58-119-152.ngrok-free.app');
 
 socket.onmessage = function(event) {
     const data = JSON.parse(event.data);
