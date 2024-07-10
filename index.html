@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Клиент</title>
+</head>
+<body>
+  <div id="status">Ждём подключения...</div>
+
+  <script>
+    const serverUrl = 'wss://eliseifox.github.io/new-dostup-s/server'; // URL сервера
+
+    const connection = new WebSocket(serverUrl);
+
+    connection.onopen = () => {
+      document.getElementById('status').innerText = 'Подключено!';
+    };
+
+    connection.onmessage = (event) => {
+      document.getElementById('status').innerText = 'Сообщение от сервера: ' + event.data;
+    };
+
+    connection.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+    };
+
+    connection.onclose = () => {
+      console.warn('Соединение закрыто');
+    };
+  </script>
+</body>
+</html>
