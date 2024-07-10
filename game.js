@@ -38,7 +38,7 @@ const obstacles = [
 ];
 
 // Соединение с сервером
-const socket = new WebSocket('https://eliseifox.github.io/new-dostup-s/');
+const socket = new WebSocket('ws://eliseifox.github.io/new-dostup-s/:5555');
 
 socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
