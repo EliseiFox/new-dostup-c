@@ -1,73 +1,215 @@
-<body>
-<canvas id="gameCanvas"></canvas>
-<button id="player1-up">Player 1 Up</button>
-<button id="player1-down">Player 1 Down</button>
-<button id="player1-left">Player 1 Left</button>
-<button id="player1-right">Player 1 Right</button>
-<button id="player1-shoot">Player 1 Shoot</button>
-<button id="player2-up">Player 2 Up</button>
-<button id="player2-down">Player 2 Down</button>
-<button id="player2-left">Player 2 Left</button>
-<button id="player2-right">Player 2 Right</button>
-<button id="player2-shoot">Player 2 Shoot</button>
-
-<script>
-    // Ваш JavaScript код здесь
-    const canvas = document.getElementById('gameCanvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 800;
-    canvas.height = 400;
-    
-    // Остальной код здесь...
-    
-    // Обработчики событий для кнопок управления
-    document.getElementById('player1-up').addEventListener('click', () => movePlayer(0, 'up'));
-    document.getElementById('player1-down').addEventListener('click', () => movePlayer(0, 'down'));
-    document.getElementById('player1-left').addEventListener('click', () => movePlayer(0, 'left'));
-    document.getElementById('player1-right').addEventListener('click', () => movePlayer(0, 'right'));
-    document.getElementById('player1-shoot').addEventListener('click', () => shootPlayer(0));
-    
-    document.getElementById('player2-up').addEventListener('click', () => movePlayer(1, 'up'));
-    document.getElementById('player2-down').addEventListener('click', () => movePlayer(1, 'down'));
-    document.getElementById('player2-left').addEventListener('click', () => movePlayer(1, 'left'));
-    document.getElementById('player2-right').addEventListener('click', () => movePlayer(1, 'right'));
-    document.getElementById('player2-shoot').addEventListener('click', () => shootPlayer(1));
-    
-    // Функции для управления движением и стрельбой
-    function movePlayer(playerIndex, direction) {
-        const player = players[playerIndex];
-        if (direction === 'up') {
-            player.pos[0] += Math.cos(player.angle) * player.speed;
-            player.pos[1] += Math.sin(player.angle) * player.speed;
-        } else if (direction === 'down') {
-            player.pos[0] -= Math.cos(player.angle) * player.speed;
-            player.pos[1] -= Math.sin(player.angle) * player.speed;
-        } else if (direction === 'left') {
-            player.pos[0] += Math.sin(player.angle) * player.speed;
-            player.pos[1] -= Math.cos(player.angle) * player.speed;
-        } else if (direction === 'right') {
-            player.pos[0] -= Math.sin(player.angle) * player.speed;
-            player.pos[1] += Math.cos(player.angle) * player.speed;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Shooter Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            margin: 0;
         }
-    }
-    
-    function shootPlayer(playerIndex) {
-        const player = players[playerIndex];
-        const currentTime = performance.now();
-        const [distance, , playerColor] = rayCasting(player.pos, player.angle, players, playerIndex);
-        if (playerColor) {
-            players.forEach((target, j) => {
-                if (target.color === playerColor) {
-                    target.health -= 1;
-                    target.hitTimer = currentTime;
-                    if (target.health <= 0) {
-                        showWinner(context, `Player ${playerIndex + 1} Wins!`);
-                        setTimeout(() => location.reload(), 3000);
+        canvas {
+            background-color: #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const context = canvas.getContext('2d');
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        const colors = {
+            black: '#000000',
+            white: '#FFFFFF',
+            red: '#FF0000',
+            green: '#00FF00',
+            yellow: '#FFFF00',
+            blue: '#0000FF',
+            purple: '#800080'
+        };
+
+        const players = [
+            { pos: [width / 4, height / 2], angle: 0, speed: 2, health: 3, color: colors.red, cooldown: 0, hitTimer: 0 },
+            { pos: [3 * width / 4, height / 2], angle: 0, speed: 2, health: 3, color: colors.blue, cooldown: 0, hitTimer: 0 }
+        ];
+
+        const controls = [
+            { up: 'w', down: 's', left: 'a', right: 'd', turnLeft: 'q', turnRight: 'e', shoot: ' ' },
+            { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', turnLeft: 'u', turnRight: 'o', shoot: 'm' }
+        ];
+
+        const angleSpeed = 0.05;
+        const numRays = 120;
+        const viewAngle = Math.PI / 3;
+        const maxDistance = 300;
+        const cooldownTime = 2000;
+        const hitTime = 1000;
+
+        const obstacles = [
+            [0, 0, width, 10], [0, height - 10, width, 10],
+            [0, 0, 10, height], [width - 10, 0, 10, height],
+            [100, 100, 50, 50], [300, 200, 60, 60],
+            [150, 300, 40, 40], [500, 150, 70, 70],
+            [600, 300, 40, 40]
+        ];
+
+        const corners = [];
+        obstacles.forEach(rect => {
+            corners.push([rect[0], rect[1]]);
+            corners.push([rect[0] + rect[2], rect[1]]);
+            corners.push([rect[0], rect[1] + rect[3]]);
+            corners.push([rect[0] + rect[2], rect[1] + rect[3]]);
+        });
+
+        function rayCasting(playerPos, angle, players, playerIndex) {
+            let [x, y] = playerPos;
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            for (let distance = 0; distance < maxDistance; distance += 5) {
+                x += dx * 5;
+                y += dy * 5;
+                if (corners.some(corner => Math.abs(corner[0] - x) < 5 && Math.abs(corner[1] - y) < 5)) {
+                    return [distance, true, null];
+                }
+                if (obstacles.some(rect => rect[0] <= x && x <= rect[0] + rect[2] && rect[1] <= y && y <= rect[1] + rect[3])) {
+                    return [distance, false, null];
+                }
+                for (let i = 0; i < players.length; i++) {
+                    if (i !== playerIndex) {
+                        const [px, py] = players[i].pos;
+                        if (px - 5 <= x && x <= px + 5 && py - 5 <= y && y <= py + 5) {
+                            return [distance, false, players[i].color];
+                        }
                     }
                 }
-            });
+            }
+            return [maxDistance, false, null];
         }
-        player.cooldown = currentTime;
-    }
-</script>
+
+        function draw3DProjection(context, player, offsetX, playerIndex, currentTime) {
+            for (let ray = 0; ray < numRays; ray++) {
+                const rayAngle = player.angle - viewAngle / 2 + viewAngle * ray / numRays;
+                const [distance, isCorner, playerColor] = rayCasting(player.pos, rayAngle, players, playerIndex);
+                const wallHeight = height * (1 - Math.sqrt(distance / maxDistance));
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                let wallColor = `rgb(${shade},${shade},${shade})`;
+                if (playerColor) {
+                    const target = players.find(p => p.color === playerColor);
+                    if (target && currentTime - target.hitTimer < hitTime) {
+                        wallColor = colors.purple;
+                    } else {
+                        wallColor = playerColor;
+                    }
+                } else if (isCorner) {
+                    wallColor = colors.yellow;
+                }
+                context.fillStyle = wallColor;
+                context.fillRect(offsetX + ray * (width / 2) / numRays, height / 2 - wallHeight / 2, (width / 2) / numRays, wallHeight);
+            }
+        }
+
+        function showWinner(context, text) {
+            context.fillStyle = colors.white;
+            context.font = '74px Arial';
+            const textSize = context.measureText(text);
+            context.fillText(text, (width - textSize.width) / 2, height / 2);
+        }
+
+        function drawHealth(context, player, offsetX) {
+            context.fillStyle = colors.white;
+            context.font = '36px Arial';
+            context.fillText(`Health: ${player.health}`, offsetX + 10, 40);
+        }
+
+        function main() {
+            let running = true;
+            function gameLoop() {
+                if (!running) return;
+                const currentTime = performance.now();
+                context.clearRect(0, 0, width, height);
+
+                players.forEach((player, i) => {
+                    const control = controls[i];
+                    const direction = [0, 0];
+                    if (keysPressed[control.up]) {
+                        direction[0] += Math.cos(player.angle);
+                        direction[1] += Math.sin(player.angle);
+                    }
+                    if (keysPressed[control.down]) {
+                        direction[0] -= Math.cos(player.angle);
+                        direction[1] -= Math.sin(player.angle);
+                    }
+                    if (keysPressed[control.left]) {
+                        direction[0] += Math.sin(player.angle);
+                        direction[1] -= Math.cos(player.angle);
+                    }
+                    if (keysPressed[control.right]) {
+                        direction[0] -= Math.sin(player.angle);
+                        direction[1] += Math.cos(player.angle);
+                    }
+                    if (keysPressed[control.turnLeft]) {
+                        player.angle -= angleSpeed;
+                    }
+                    if (keysPressed[control.turnRight]) {
+                        player.angle += angleSpeed;
+                    }
+
+                    player.pos[0] += direction[0] * player.speed;
+                    player.pos[1] += direction[1] * player.speed;
+
+                    if (keysPressed[control.shoot] && currentTime - player.cooldown > cooldownTime) {
+                        const [distance, , playerColor] = rayCasting(player.pos, player.angle, players, i);
+                        if (playerColor) {
+                            const target = players.find(p => p.color === playerColor);
+                            if (target) {
+                                target.health -= 1;
+                                target.hitTimer = currentTime;
+                                if (target.health <= 0) {
+                                    showWinner(context, `Player ${i + 1} Wins!`);
+                                    running = false;
+                                    setTimeout(() => location.reload(), 3000);
+                                }
+                            }
+                        }
+                        player.cooldown = currentTime;
+                    }
+                });
+
+                draw3DProjection(context, players[0], 0, 0, currentTime);
+                draw3DProjection(context, players[1], width / 2, 1, currentTime);
+
+                drawHealth(context, players[0], 0);
+                drawHealth(context, players[1], width / 2);
+
+                context.beginPath();
+                context.arc(width / 4, height / 2, 3, 0, Math.PI * 2);
+                context.arc(3 * width / 4, height / 2, 3, 0, Math.PI * 2);
+                context.fillStyle = colors.white;
+                context.fill();
+
+                requestAnimationFrame(gameLoop);
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        const keysPressed = {};
+        window.addEventListener('keydown', (e) => {
+            keysPressed[e.key] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keysPressed[e.key] = false;
+        });
+
+        main();
+    </script>
 </body>
+</html>
