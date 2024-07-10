@@ -9,12 +9,13 @@
   <div id="status">Ждём подключения...</div>
 
   <script>
-    const serverUrl = 'wss://eliseifox.github.io/new-dostup-s/server'; // URL сервера
+    const serverUrl = 'wss://echo.websocket.org/'; // Используем WebSocket прокси
 
     const connection = new WebSocket(serverUrl);
 
     connection.onopen = () => {
       document.getElementById('status').innerText = 'Подключено!';
+      connection.send('Привет, сервер!');
     };
 
     connection.onmessage = (event) => {
