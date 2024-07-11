@@ -30,12 +30,10 @@
     const PURPLE = '#800080';
     const YELLOW = '#FFFF00';
 
-    let players = [
-      { id: 1, pos: { x: width / 4, y: height / 2 }, angle: 0, speed: 2, health: 3, color: RED, cooldown: 0, hit_timer: 0 }
-    ];
+    const playerId = Math.floor(Math.random() * 100000); // Генерация уникального ID для каждого игрока
 
-    let otherPlayer = {
-      id: 2, pos: { x: 3 * width / 4, y: height / 2 }, angle: 0, speed: 2, health: 3, color: BLUE, cooldown: 0, hit_timer: 0
+    let players = {
+      [playerId]: { id: playerId, pos: { x: width / 4, y: height / 2 }, angle: 0, speed: 2, health: 3, color: RED, cooldown: 0, hit_timer: 0 }
     };
 
     const controls = [
@@ -84,11 +82,11 @@
             return [distance, false, null];
           }
         }
-        for (let i = 0; i < players.length; i++) {
-          if (i !== player_index) {
-            let { x: px, y: py } = players[i].pos;
+        for (let key in players) {
+          if (key !== player_index.toString()) {
+            let { x: px, y: py } = players[key].pos;
             if (px - 5 <= x && x <= px + 5 && py - 5 <= y && y <= py + 5) {
-              return [distance, false, players[i].color];
+              return [distance, false, players[key].color];
             }
           }
         }
@@ -104,8 +102,8 @@
         let shade = 255 - Math.floor(distance * 255 / max_distance);
         let wall_color;
         if (player_color) {
-          for (let p of players) {
-            if (p.color === player_color && current_time - p.hit_timer < hit_time) {
+          for (let key in players) {
+            if (players[key].color === player_color && current_time - players[key].hit_timer < hit_time) {
               player_color = PURPLE;
             }
           }
@@ -125,53 +123,59 @@
     }
 
     function receiveData(event) {
-      let data = JSON.parse(event.data);
-      otherPlayer = { ...otherPlayer, ...data };
+      const data = JSON.parse(event.data);
+      players = { ...data };
     }
 
     ws.addEventListener('message', receiveData);
 
     function sendData() {
-      let data = JSON.stringify({
-        pos: players[0].pos,
-        angle: players[0].angle,
-        health: players[0].health,
-        color: players[0].color,
-        cooldown: players[0].cooldown,
-        hit_timer: players[0].hit_timer,
+      const player = players[playerId];
+      ws.send(JSON.stringify({
+        id: playerId,
+        pos: player.pos,
+        angle: player.angle,
+        health: player.health,
+        color: player.color,
+        cooldown: player.cooldown,
+        hit_timer: player.hit_timer,
         time: performance.now()
-      });
-      ws.send(data);
+      }));
     }
 
     setInterval(sendData, 1000 / FPS);
 
     document.addEventListener('keydown', (event) => {
+      const player = players[playerId];
       switch (event.key) {
         case 'w':
-          players[0].pos.y -= players[0].speed;
+          player.pos.y -= player.speed;
           break;
         case 's':
-          players[0].pos.y += players[0].speed;
+          player.pos.y += player.speed;
           break;
         case 'a':
-          players[0].pos.x -= players[0].speed;
+          player.pos.x -= player.speed;
           break;
         case 'd':
-          players[0].pos.x += players[0].speed;
+          player.pos.x += player.speed;
           break;
         case 'q':
-          players[0].angle -= 0.05;
+          player.angle -= 0.05;
           break;
         case 'e':
-          players[0].angle += 0.05;
+          player.angle += 0.05;
           break;
       }
       ws.send(JSON.stringify({
-        type: 'playerMovement',
-        id: players[0].id,
-        pos: players[0].pos,
-        angle: players[0].angle
+        id: playerId,
+        pos: player.pos,
+        angle: player.angle,
+        health: player.health,
+        color: player.color,
+        cooldown: player.cooldown,
+        hit_timer: player.hit_timer,
+        time: performance.now()
       }));
     });
 
@@ -181,9 +185,12 @@
 
       let current_time = performance.now();
 
-      draw_3d_projection(ctx, players[0], obstacles, [players[0], otherPlayer], 0, current_time);
-      draw_health(ctx, players[0]);
-      draw_health(ctx, otherPlayer);
+      for (let key in players) {
+        if (players.hasOwnProperty(key)) {
+          draw_3d_projection(ctx, players[key], obstacles, players, key, current_time);
+          draw_health(ctx, players[key]);
+        }
+      }
 
       requestAnimationFrame(gameLoop);
     }
