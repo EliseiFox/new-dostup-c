@@ -3,165 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multiplayer Game</title>
+  <title>WebSocket Game</title>
   <style>
-    body { margin: 0; }
-    canvas { display: block; }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: black;
+    }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
   <script>
-    const canvas = document.getElementById('gameCanvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 800;
-    canvas.height = 400;
+    const ws = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
 
-    const player = {
-      id: Math.random().toString(36).substring(2),
-      pos: { x: 200, y: 200 },
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const FPS = 60;
+    const BLACK = '#000000';
+    const WHITE = '#FFFFFF';
+    const RED = '#FF0000';
+    const BLUE = '#0000FF';
+    const PURPLE = '#800080';
+    const YELLOW = '#FFFF00';
+
+    let players = [
+      { pos: [width / 4, height / 2], angle: 0, speed: 2, health: 3, color: RED, cooldown: 0, hit_timer: 0 }
+    ];
+
+    let otherPlayer = {
+      pos: [3 * width / 4, height / 2],
       angle: 0,
       speed: 2,
       health: 3,
-      color: 'red',
+      color: BLUE,
       cooldown: 0,
       hit_timer: 0
     };
 
-    const otherPlayers = {};
-
-    const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
-
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({
-        type: 'newPlayer',
-        id: player.id,
-        pos: player.pos
-      }));
-    });
-
-    socket.addEventListener('message', (event) => {
-      const data = JSON.parse(event.data);
-      switch (data.type) {
-        case 'currentPlayers':
-          Object.keys(data.players).forEach((id) => {
-            if (id !== player.id) {
-              otherPlayers[id] = data.players[id];
-            } else {
-              player.color = data.players[id].color;
-            }
-          });
-          draw();
-          break;
-        case 'playerMoved':
-          otherPlayers[data.player.id] = data.player;
-          break;
-        case 'playerDisconnected':
-          delete otherPlayers[data.id];
-          break;
-      }
-    });
-
-    document.addEventListener('keydown', (event) => {
-      switch (event.key) {
-        case 'w':
-          player.pos.y -= player.speed;
-          break;
-        case 's':
-          player.pos.y += player.speed;
-          break;
-        case 'a':
-          player.pos.x -= player.speed;
-          break;
-        case 'd':
-          player.pos.x += player.speed;
-          break;
-        case 'q':
-          player.angle -= 0.05;
-          break;
-        case 'e':
-          player.angle += 0.05;
-          break;
-      }
-      socket.send(JSON.stringify({
-        type: 'playerMovement',
-        id: player.id,
-        pos: player.pos,
-        angle: player.angle
-      }));
-    });
-
-    const obstacles = [
-      { x: 0, y: 0, width: 800, height: 10 },
-      { x: 0, y: 390, width: 800, height: 10 },
-      { x: 0, y: 0, width: 10, height: 400 },
-      { x: 790, y: 0, width: 10, height: 400 },
-      { x: 100, y: 100, width: 50, height: 50 },
-      { x: 300, y: 200, width: 60, height: 60 },
-      { x: 150, y: 300, width: 40, height: 40 },
-      { x: 500, y: 150, width: 70, height: 70 },
-      { x: 600, y: 300, width: 40, height: 40 }
+    const controls = [
+      { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS', turn_left: 'KeyQ', turn_right: 'KeyE', shoot: 'Space' }
     ];
 
-    function rayCasting(player, angle) {
-      let x = player.pos.x;
-      let y = player.pos.y;
-      const dx = Math.cos(angle);
-      const dy = Math.sin(angle);
-      for (let distance = 0; distance < 300; distance += 5) {
+    const angle_speed = 0.05;
+    const num_rays = 120;
+    const view_angle = Math.PI / 3;
+    const max_distance = 300;
+    const cooldown_time = 2000; // Cooldown in milliseconds
+    const hit_time = 1000; // Time for color change when hit
+
+    const obstacles = [
+      [0, 0, width, 10], // Top wall
+      [0, height - 10, width, 10], // Bottom wall
+      [0, 0, 10, height], // Left wall
+      [width - 10, 0, 10, height], // Right wall
+      [100, 100, 50, 50], // Obstacle
+      [300, 200, 60, 60], // Obstacle
+      [150, 300, 40, 40], // Obstacle
+      [500, 150, 70, 70], // Obstacle
+      [600, 300, 40, 40] // Obstacle
+    ];
+
+    const corners = [];
+    for (let rect of obstacles) {
+      corners.push([rect[0], rect[1]]);
+      corners.push([rect[0] + rect[2], rect[1]]);
+      corners.push([rect[0], rect[1] + rect[3]]);
+      corners.push([rect[0] + rect[2], rect[1] + rect[3]]);
+    }
+
+    function ray_casting(player_pos, angle, players, player_index) {
+      let [x, y] = player_pos;
+      let dx = Math.cos(angle);
+      let dy = Math.sin(angle);
+      for (let distance = 0; distance < max_distance; distance += 5) {
         x += dx * 5;
         y += dy * 5;
-        for (let i = 0; i < obstacles.length; i++) {
-          const obs = obstacles[i];
-          if (x > obs.x && x < obs.x + obs.width && y > obs.y && y < obs.y + obs.height) {
-            return distance;
+        if (corners.some(corner => corner[0] === Math.floor(x) && corner[1] === Math.floor(y))) {
+          return [distance, true, null];
+        }
+        for (let rect of obstacles) {
+          if (rect[0] <= x && x <= rect[0] + rect[2] && rect[1] <= y && y <= rect[1] + rect[3]) {
+            return [distance, false, null];
           }
         }
-        for (const id in otherPlayers) {
-          const other = otherPlayers[id];
-          if (x > other.pos.x - 10 && x < other.pos.x + 10 && y > other.pos.y - 10 && y < other.pos.y + 10) {
-            return distance;
+        for (let i = 0; i < players.length; i++) {
+          if (i !== player_index) {
+            let [px, py] = players[i].pos;
+            if (px - 5 <= x && x <= px + 5 && py - 5 <= y && y <= py + 5) {
+              return [distance, false, players[i].color];
+            }
           }
         }
       }
-      return 300;
+      return [max_distance, false, null];
     }
 
-    function draw3DProjection(player) {
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      for (let ray = 0; ray < 120; ray++) {
-        const rayAngle = player.angle - Math.PI / 6 + ray * Math.PI / 90;
-        const distance = rayCasting(player, rayAngle);
-        const wallHeight = canvas.height * (1 - distance / 300);
-        const shade = 255 - distance * 255 / 300;
-        context.fillStyle = `rgb(${shade},${shade},${shade})`;
-        context.fillRect(ray * (canvas.width / 120), canvas.height / 2 - wallHeight / 2, canvas.width / 120, wallHeight);
+    function draw_3d_projection(ctx, player, obstacles, players, player_index, current_time) {
+      for (let ray = 0; ray < num_rays; ray++) {
+        let ray_angle = player.angle - view_angle / 2 + view_angle * ray / num_rays;
+        let [distance, is_corner, player_color] = ray_casting(player.pos, ray_angle, players, player_index);
+        let wall_height = height * (1 - Math.sqrt(distance / max_distance));
+        let shade = 255 - Math.floor(distance * 255 / max_distance);
+        let wall_color;
+        if (player_color) {
+          for (let p of players) {
+            if (p.color === player_color && current_time - p.hit_timer < hit_time) {
+              player_color = PURPLE;
+            }
+          }
+          wall_color = player_color;
+        } else {
+          wall_color = is_corner ? YELLOW : `rgb(${shade}, ${shade}, ${shade})`;
+        }
+        ctx.fillStyle = wall_color;
+        ctx.fillRect(ray * (width / num_rays), height / 2 - wall_height / 2, width / num_rays, wall_height);
       }
     }
 
-    function drawHealth(player) {
-      context.fillStyle = 'white';
-      context.font = '20px Arial';
-      context.fillText(`Health: ${player.health}`, 10, 20);
+    function draw_health(ctx, player) {
+      ctx.font = '36px sans-serif';
+      ctx.fillStyle = WHITE;
+      ctx.fillText(`Health: ${player.health}`, 10, 36);
     }
 
-    function draw() {
-      draw3DProjection(player);
-      drawHealth(player);
+    function receiveData(event) {
+      let data = JSON.parse(event.data);
+      otherPlayer = { ...otherPlayer, ...data };
+    }
 
-      context.fillStyle = player.color;
-      context.fillRect(player.pos.x - 10, player.pos.y - 10, 20, 20);
+    ws.addEventListener('message', receiveData);
 
-      Object.keys(otherPlayers).forEach((id) => {
-        const otherPlayer = otherPlayers[id];
-        context.fillStyle = otherPlayer.color;
-        context.fillRect(otherPlayer.pos.x - 10, otherPlayer.pos.y - 10, 20, 20);
+    function sendData() {
+      let data = JSON.stringify({
+        pos: players[0].pos,
+        angle: players[0].angle,
+        health: players[0].health,
+        color: players[0].color,
+        cooldown: players[0].cooldown,
+        hit_timer: players[0].hit_timer,
+        time: performance.now()
       });
-
-      requestAnimationFrame(draw);
+      ws.send(data);
     }
 
-    draw();
+    setInterval(sendData, 1000 / FPS);
+
+    function gameLoop() {
+      ctx.fillStyle = BLACK;
+      ctx.fillRect(0, 0, width, height);
+
+      let keys = {};
+      document.addEventListener('keydown', (event) => keys[event.code] = true);
+      document.addEventListener('keyup', (event) => keys[event.code] = false);
+
+      let current_time = performance.now();
+      for (let i = 0; i < players.length; i++) {
+        let player = players[i];
+        let control = controls[i];
+        let direction = [0, 0];
+        if (keys[control.up]) {
+          direction[0] += Math.cos(player.angle);
+          direction[1] += Math.sin(player.angle);
+        }
+        if (keys[control.down]) {
+          direction[0] -= Math.cos(player.angle);
+          direction[1] -= Math.sin(player.angle);
+        }
+        if (keys[control.left]) {
+          direction[0] += Math.sin(player.angle);
+          direction[1] -= Math.cos(player.angle);
+        }
+        if (keys[control.right]) {
+          direction[0] -= Math.sin(player.angle);
+          direction[1] += Math.cos(player.angle);
+        }
+        if (keys[control.turn_left]) {
+          player.angle -= angle_speed;
+        }
+        if (keys[control.turn_right]) {
+          player.angle += angle_speed;
+        }
+
+        player.pos[0] += direction[0] * player.speed;
+        player.pos[1] += direction[1] * player.speed;
+
+        if (keys[control.shoot] && current_time - player.cooldown > cooldown_time) {
+          let ray_angle = player.angle;
+          let [distance, _, player_color] = ray_casting(player.pos, ray_angle, players, i);
+          if (player_color) {
+            if (otherPlayer.color === player_color) {
+              otherPlayer.health -= 1;
+              otherPlayer.hit_timer = current_time;
+              if (otherPlayer.health <= 0) {
+                console.log('You won!');
+                return;
+              }
+            }
+          }
+          player.cooldown = current_time;
+        }
+      }
+
+      draw_3d_projection(ctx, players[0], obstacles, [players[0], otherPlayer], 0, current_time);
+      draw_health(ctx, players[0]);
+      draw_health(ctx, otherPlayer);
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
   </script>
 </body>
 </html>
