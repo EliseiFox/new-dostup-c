@@ -19,11 +19,13 @@
 
     const player = {
       id: Math.random().toString(36).substring(2),
-      pos: { x: 400, y: 200 },
+      pos: { x: 200, y: 200 },
       angle: 0,
       speed: 2,
       health: 3,
-      color: 'red'
+      color: 'red',
+      cooldown: 0,
+      hit_timer: 0
     };
 
     const otherPlayers = {};
@@ -33,7 +35,8 @@
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({
         type: 'newPlayer',
-        id: player.id
+        id: player.id,
+        pos: player.pos
       }));
     });
 
@@ -88,8 +91,63 @@
       }));
     });
 
-    function draw() {
+    const obstacles = [
+      { x: 0, y: 0, width: 800, height: 10 },
+      { x: 0, y: 390, width: 800, height: 10 },
+      { x: 0, y: 0, width: 10, height: 400 },
+      { x: 790, y: 0, width: 10, height: 400 },
+      { x: 100, y: 100, width: 50, height: 50 },
+      { x: 300, y: 200, width: 60, height: 60 },
+      { x: 150, y: 300, width: 40, height: 40 },
+      { x: 500, y: 150, width: 70, height: 70 },
+      { x: 600, y: 300, width: 40, height: 40 }
+    ];
+
+    function rayCasting(player, angle) {
+      let x = player.pos.x;
+      let y = player.pos.y;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      for (let distance = 0; distance < 300; distance += 5) {
+        x += dx * 5;
+        y += dy * 5;
+        for (let i = 0; i < obstacles.length; i++) {
+          const obs = obstacles[i];
+          if (x > obs.x && x < obs.x + obs.width && y > obs.y && y < obs.y + obs.height) {
+            return distance;
+          }
+        }
+        for (const id in otherPlayers) {
+          const other = otherPlayers[id];
+          if (x > other.pos.x - 10 && x < other.pos.x + 10 && y > other.pos.y - 10 && y < other.pos.y + 10) {
+            return distance;
+          }
+        }
+      }
+      return 300;
+    }
+
+    function draw3DProjection(player) {
       context.clearRect(0, 0, canvas.width, canvas.height);
+      for (let ray = 0; ray < 120; ray++) {
+        const rayAngle = player.angle - Math.PI / 6 + ray * Math.PI / 90;
+        const distance = rayCasting(player, rayAngle);
+        const wallHeight = canvas.height * (1 - distance / 300);
+        const shade = 255 - distance * 255 / 300;
+        context.fillStyle = `rgb(${shade},${shade},${shade})`;
+        context.fillRect(ray * (canvas.width / 120), canvas.height / 2 - wallHeight / 2, canvas.width / 120, wallHeight);
+      }
+    }
+
+    function drawHealth(player) {
+      context.fillStyle = 'white';
+      context.font = '20px Arial';
+      context.fillText(`Health: ${player.health}`, 10, 20);
+    }
+
+    function draw() {
+      draw3DProjection(player);
+      drawHealth(player);
 
       context.fillStyle = player.color;
       context.fillRect(player.pos.x - 10, player.pos.y - 10, 20, 20);
@@ -102,6 +160,8 @@
 
       requestAnimationFrame(draw);
     }
+
+    draw();
   </script>
 </body>
 </html>
