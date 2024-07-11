@@ -1,58 +1,107 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>WebSocket Example</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiplayer Game</title>
   <style>
-    #message {
-      font-size: 20px; /* Размер текста */
-      padding: 20px;   /* Отступы */
-      text-align: center; /* Выравнивание текста по центру */
-    }
-    #confirm-button {
-      font-size: 20px; /* Размер текста */
-      padding: 10px 20px; /* Отступы */
-      cursor: pointer; /* Указатель мыши при наведении */
-    }
+    body { margin: 0; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <h1 id="message">Confirm Ngrok Usage</h1>
-  <p>Click the button below to confirm you want to use Ngrok:</p>
-  <button id="confirm-button">Confirm</button>
-
+  <canvas id="gameCanvas"></canvas>
   <script>
-    document.getElementById('confirm-button').addEventListener('click', () => {
-      fetch('https://ef9a-212-58-119-152.ngrok-free.app', {
-        method: 'GET',
-        headers: {
-          'ngrok-skip-browser-warning': 'true'
-        }
-      }).then(() => {
-        document.getElementById('message').innerText = 'Waiting for message...';
-        document.getElementById('confirm-button').style.display = 'none';
+    const canvas = document.getElementById('gameCanvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 800;
+    canvas.height = 400;
 
-        const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
+    const player = {
+      id: Math.random().toString(36).substring(2),
+      pos: { x: 400, y: 200 },
+      angle: 0,
+      speed: 2,
+      health: 3,
+      color: 'red'
+    };
 
-        socket.addEventListener('open', (event) => {
-          console.log('WebSocket is connected.');
-        });
+    const otherPlayers = {};
 
-        socket.addEventListener('message', (event) => {
-          document.getElementById('message').innerText = event.data;
-        });
+    const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
 
-        socket.addEventListener('close', (event) => {
-          console.log('WebSocket is closed.');
-        });
-
-        socket.addEventListener('error', (error) => {
-          console.error('WebSocket error:', error);
-        });
-      }).catch(error => {
-        console.error('Fetch error:', error);
-      });
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({
+        type: 'newPlayer',
+        id: player.id
+      }));
     });
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      switch (data.type) {
+        case 'currentPlayers':
+          Object.keys(data.players).forEach((id) => {
+            if (id !== player.id) {
+              otherPlayers[id] = data.players[id];
+            } else {
+              player.color = data.players[id].color;
+            }
+          });
+          draw();
+          break;
+        case 'playerMoved':
+          otherPlayers[data.player.id] = data.player;
+          break;
+        case 'playerDisconnected':
+          delete otherPlayers[data.id];
+          break;
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      switch (event.key) {
+        case 'w':
+          player.pos.y -= player.speed;
+          break;
+        case 's':
+          player.pos.y += player.speed;
+          break;
+        case 'a':
+          player.pos.x -= player.speed;
+          break;
+        case 'd':
+          player.pos.x += player.speed;
+          break;
+        case 'q':
+          player.angle -= 0.05;
+          break;
+        case 'e':
+          player.angle += 0.05;
+          break;
+      }
+      socket.send(JSON.stringify({
+        type: 'playerMovement',
+        id: player.id,
+        pos: player.pos,
+        angle: player.angle
+      }));
+    });
+
+    function draw() {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+
+      context.fillStyle = player.color;
+      context.fillRect(player.pos.x - 10, player.pos.y - 10, 20, 20);
+
+      Object.keys(otherPlayers).forEach((id) => {
+        const otherPlayer = otherPlayers[id];
+        context.fillStyle = otherPlayer.color;
+        context.fillRect(otherPlayer.pos.x - 10, otherPlayer.pos.y - 10, 20, 20);
+      });
+
+      requestAnimationFrame(draw);
+    }
   </script>
 </body>
 </html>
