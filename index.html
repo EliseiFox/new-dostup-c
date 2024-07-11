@@ -31,17 +31,11 @@
     const YELLOW = '#FFFF00';
 
     let players = [
-      { pos: [width / 4, height / 2], angle: 0, speed: 2, health: 3, color: RED, cooldown: 0, hit_timer: 0 }
+      { id: 1, pos: { x: width / 4, y: height / 2 }, angle: 0, speed: 2, health: 3, color: RED, cooldown: 0, hit_timer: 0 }
     ];
 
     let otherPlayer = {
-      pos: [3 * width / 4, height / 2],
-      angle: 0,
-      speed: 2,
-      health: 3,
-      color: BLUE,
-      cooldown: 0,
-      hit_timer: 0
+      id: 2, pos: { x: 3 * width / 4, y: height / 2 }, angle: 0, speed: 2, health: 3, color: BLUE, cooldown: 0, hit_timer: 0
     };
 
     const controls = [
@@ -76,7 +70,7 @@
     }
 
     function ray_casting(player_pos, angle, players, player_index) {
-      let [x, y] = player_pos;
+      let { x, y } = player_pos;
       let dx = Math.cos(angle);
       let dy = Math.sin(angle);
       for (let distance = 0; distance < max_distance; distance += 5) {
@@ -92,7 +86,7 @@
         }
         for (let i = 0; i < players.length; i++) {
           if (i !== player_index) {
-            let [px, py] = players[i].pos;
+            let { x: px, y: py } = players[i].pos;
             if (px - 5 <= x && x <= px + 5 && py - 5 <= y && y <= py + 5) {
               return [distance, false, players[i].color];
             }
@@ -152,61 +146,40 @@
 
     setInterval(sendData, 1000 / FPS);
 
-    let keys = {};
-    document.addEventListener('keydown', (event) => keys[event.code] = true);
-    document.addEventListener('keyup', (event) => keys[event.code] = false);
+    document.addEventListener('keydown', (event) => {
+      switch (event.key) {
+        case 'w':
+          players[0].pos.y -= players[0].speed;
+          break;
+        case 's':
+          players[0].pos.y += players[0].speed;
+          break;
+        case 'a':
+          players[0].pos.x -= players[0].speed;
+          break;
+        case 'd':
+          players[0].pos.x += players[0].speed;
+          break;
+        case 'q':
+          players[0].angle -= 0.05;
+          break;
+        case 'e':
+          players[0].angle += 0.05;
+          break;
+      }
+      ws.send(JSON.stringify({
+        type: 'playerMovement',
+        id: players[0].id,
+        pos: players[0].pos,
+        angle: players[0].angle
+      }));
+    });
 
     function gameLoop() {
       ctx.fillStyle = BLACK;
       ctx.fillRect(0, 0, width, height);
 
       let current_time = performance.now();
-      for (let i = 0; i < players.length; i++) {
-        let player = players[i];
-        let control = controls[i];
-        let direction = [0, 0];
-        if (keys[control.up]) {
-          direction[0] += Math.cos(player.angle);
-          direction[1] += Math.sin(player.angle);
-        }
-        if (keys[control.down]) {
-          direction[0] -= Math.cos(player.angle);
-          direction[1] -= Math.sin(player.angle);
-        }
-        if (keys[control.left]) {
-          direction[0] += Math.sin(player.angle);
-          direction[1] -= Math.cos(player.angle);
-        }
-        if (keys[control.right]) {
-          direction[0] -= Math.sin(player.angle);
-          direction[1] += Math.cos(player.angle);
-        }
-        if (keys[control.turn_left]) {
-          player.angle -= angle_speed;
-        }
-        if (keys[control.turn_right]) {
-          player.angle += angle_speed;
-        }
-
-        player.pos[0] += direction[0] * player.speed;
-        player.pos[1] += direction[1] * player.speed;
-
-        if (keys[control.shoot] && current_time - player.cooldown > cooldown_time) {
-          let ray_angle = player.angle;
-          let [distance, _, player_color] = ray_casting(player.pos, ray_angle, players, i);
-          if (player_color) {
-            if (otherPlayer.color === player_color) {
-              otherPlayer.health -= 1;
-              otherPlayer.hit_timer = current_time;
-              if (otherPlayer.health <= 0) {
-                console.log('You won!');
-                return;
-              }
-            }
-          }
-          player.cooldown = current_time;
-        }
-      }
 
       draw_3d_projection(ctx, players[0], obstacles, [players[0], otherPlayer], 0, current_time);
       draw_health(ctx, players[0]);
