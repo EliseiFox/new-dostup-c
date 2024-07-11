@@ -2,9 +2,17 @@
 <html>
 <head>
   <title>WebSocket Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    #message {
+      font-size: 20px; /* Размер текста */
+      padding: 20px;   /* Отступы */
+      text-align: center; /* Выравнивание текста по центру */
+    }
+  </style>
 </head>
 <body>
-  <h1 id="message"></h1>
+  <h1 id="message">Waiting for message...</h1>
 
   <script>
     const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
