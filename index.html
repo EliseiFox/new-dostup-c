@@ -15,7 +15,6 @@
 <body>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
   <script>
-    // Use the ngrok provided URL for WebSocket connection
     const ws = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
 
     const canvas = document.getElementById('gameCanvas');
@@ -153,13 +152,13 @@
 
     setInterval(sendData, 1000 / FPS);
 
+    let keys = {};
+    document.addEventListener('keydown', (event) => keys[event.code] = true);
+    document.addEventListener('keyup', (event) => keys[event.code] = false);
+
     function gameLoop() {
       ctx.fillStyle = BLACK;
       ctx.fillRect(0, 0, width, height);
-
-      let keys = {};
-      document.addEventListener('keydown', (event) => keys[event.code] = true);
-      document.addEventListener('keyup', (event) => keys[event.code] = false);
 
       let current_time = performance.now();
       for (let i = 0; i < players.length; i++) {
