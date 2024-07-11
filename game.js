@@ -46,13 +46,25 @@ obstacles.forEach(rect => {
     corners.push([rect[0] + rect[2], rect[1] + rect[3]]);
 });
 
-const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app/');
+const socket = new WebSocket('wss://your-ngrok-url.ngrok-free.app');
+
+socket.addEventListener('open', () => {
+    console.log('WebSocket connection opened');
+});
 
 socket.addEventListener('message', event => {
     const data = JSON.parse(event.data);
     if (data.type === 'updatePlayer') {
         Object.assign(otherPlayer, data.player);
     }
+});
+
+socket.addEventListener('error', (error) => {
+    console.error('WebSocket error:', error);
+});
+
+socket.addEventListener('close', () => {
+    console.log('WebSocket connection closed');
 });
 
 function rayCasting(playerPos, angle, players, playerIndex) {
@@ -182,7 +194,12 @@ function gameLoop() {
                 hitTimer: player.hitTimer
             }
         };
-        socket.send(JSON.stringify(playerData));
+
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(playerData));
+        } else {
+            console.log('WebSocket is not open. readyState:', socket.readyState);
+        }
     });
 
     draw3DProjection(players[0], [players[0], otherPlayer], 0, currentTime);
