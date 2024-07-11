@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Confirm Ngrok Usage</title>
+  <title>WebSocket Example</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    #message {
+      font-size: 20px; /* Размер текста */
+      padding: 20px;   /* Отступы */
+      text-align: center; /* Выравнивание текста по центру */
+    }
     #confirm-button {
       font-size: 20px; /* Размер текста */
       padding: 10px 20px; /* Отступы */
@@ -12,7 +17,7 @@
   </style>
 </head>
 <body>
-  <h1>Confirm Ngrok Usage</h1>
+  <h1 id="message">Confirm Ngrok Usage</h1>
   <p>Click the button below to confirm you want to use Ngrok:</p>
   <button id="confirm-button">Confirm</button>
 
@@ -24,7 +29,26 @@
           'ngrok-skip-browser-warning': 'true'
         }
       }).then(() => {
-        window.location.href = 'game.html'; // Переход на страницу с приложением
+        document.getElementById('message').innerText = 'Waiting for message...';
+        document.getElementById('confirm-button').style.display = 'none';
+
+        const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
+
+        socket.addEventListener('open', (event) => {
+          console.log('WebSocket is connected.');
+        });
+
+        socket.addEventListener('message', (event) => {
+          document.getElementById('message').innerText = event.data;
+        });
+
+        socket.addEventListener('close', (event) => {
+          console.log('WebSocket is closed.');
+        });
+
+        socket.addEventListener('error', (error) => {
+          console.error('WebSocket error:', error);
+        });
       }).catch(error => {
         console.error('Fetch error:', error);
       });
