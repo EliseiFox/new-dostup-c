@@ -18,9 +18,9 @@
     // Отправляем fetch-запрос с заголовком перед установкой WebSocket-соединения
     fetch('https://ef9a-212-58-119-152.ngrok-free.app', {
       method: 'GET',
-      headers: {
-        'ngrok-skip-browser-warning': 'true'
-      }
+      headers: new Headers({
+        'ngrok-skip-browser-warning': '69420'
+      }),
     }).then(() => {
       const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
 
