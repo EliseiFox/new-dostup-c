@@ -46,7 +46,7 @@ obstacles.forEach(rect => {
     corners.push([rect[0] + rect[2], rect[1] + rect[3]]);
 });
 
-const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
+const socket = new WebSocket('wss://your-ngrok-url.ngrok-free.app');
 
 socket.addEventListener('message', event => {
     const data = JSON.parse(event.data);
