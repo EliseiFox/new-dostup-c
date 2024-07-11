@@ -10,7 +10,7 @@ const BLUE = 'blue';
 const PURPLE = 'purple';
 const YELLOW = 'yellow';
 
-const angleSpeed = 0.05;
+const angleSpeed = 0.06;
 const numRays = 120;
 const viewAngle = Math.PI / 3;
 const maxDistance = 300;
