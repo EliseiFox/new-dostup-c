@@ -15,7 +15,21 @@
   <h1 id="message">Waiting for message...</h1>
 
   <script>
-    const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
+    // Создаем экземпляр WebSocket с заголовком
+    function createWebSocket(url, protocols) {
+      const ws = new WebSocket(url, protocols);
+      
+      // Перехватываем метод send для добавления заголовка
+      const originalSend = ws.send;
+      ws.send = function (data) {
+        this.setRequestHeader('ngrok-skip-browser-warning', 'true');
+        originalSend.apply(this, arguments);
+      };
+      
+      return ws;
+    }
+
+    const socket = createWebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
 
     socket.addEventListener('open', (event) => {
       console.log('WebSocket is connected.');
