@@ -1,17 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ngrok Example</title>
+  <title>WebSocket Example</title>
 </head>
 <body>
   <h1 id="message"></h1>
 
   <script>
-    fetch('https://ef9a-212-58-119-152.ngrok-free.app/get-message')
-      .then(response => response.text())
-      .then(data => {
-        document.getElementById('message').innerText = data;
-      });
+    const socket = new WebSocket('wss://ef9a-212-58-119-152.ngrok-free.app');
+
+    socket.addEventListener('open', (event) => {
+      console.log('WebSocket is connected.');
+    });
+
+    socket.addEventListener('message', (event) => {
+      document.getElementById('message').innerText = event.data;
+    });
+
+    socket.addEventListener('close', (event) => {
+      console.log('WebSocket is closed.');
+    });
+
+    socket.addEventListener('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
   </script>
 </body>
 </html>
