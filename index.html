@@ -41,6 +41,13 @@
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
+        document.addEventListener('keydown', function(event) {
+            // Проверяем нажатую клавишу
+            if (event.key === ' ') {
+                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
+                event.preventDefault();
+            }
+        });
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
