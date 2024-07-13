@@ -226,6 +226,8 @@
         }
         
         function resetGame() {
+            var messageContainer = document.getElementById('messageContainer');
+            messageContainer.style.display = 'none'
             playerHP = 3;
             opponentHP = 3;
             playerPos = { x: width / 4, y: height / 2 };
