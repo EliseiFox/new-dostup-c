@@ -176,9 +176,19 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 alert('Ты проиграл');
+                resetGame();
             } else if (opponentHP <= 0) {
                 alert('Ты победил');
+                resetGame();
             }
+        }
+
+        function resetGame() {
+            playerHP = 3;
+            opponentHP = 3;
+            playerPos = { x: width / 4, y: height / 2 };
+            playerAngle = 0;
+            socket.send(JSON.stringify({ action: 'reset' }));
         }
 
         function gameLoop() {
