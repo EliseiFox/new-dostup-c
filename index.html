@@ -30,9 +30,22 @@
             color: white;
             font-size: 20px;
         }
+        #messageContainer {
+            position: fixed;
+            top: 50%; /* Позиционирование по вертикали на половину экрана */
+            left: 50%; /* Позиционирование по горизонтали на половину экрана */
+            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
+            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
+            color: white;
+            padding: 20px;
+            font-size: 30px;
+            text-align: center;
+            display: none; /* Начально скрываем элемент */
+        }
     </style>
 </head>
 <body>
+    <div id="messageContainer"></div>
     <button class="open-link-button no-select" onclick="openAnotherSite()">Open Site</button>
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
@@ -206,9 +219,9 @@
         }
     
         function displayMessage(message) {
-            var messageElement = document.getElementById('message');
-            messageElement.textContent = message.toUpperCase(); // Выводим текст большими буквами
-            }
+            var messageContainer = document.getElementById('messageContainer');
+            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
+            messageContainer.style.display = 'block'; // Показываем элемент сообщений
         }
 
         function resetGame() {
