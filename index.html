@@ -13,16 +13,19 @@
             display: block;
             background: black;
         }
+        #hpDisplay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+        }
     </style>
 </head>
-<a href="https://013a-212-58-119-152.ngrok-free.app" target="_blank" id="new-tab-link">Open in new tab</a>
-
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="hpDisplay">HP: 3</div>
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
-    document.getElementById("new-tab-link").click();
-  });
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -34,6 +37,7 @@
         const BLACK = 'black';
         const YELLOW = 'yellow';
         const RED = 'red';
+        const PURPLE = 'purple';
 
         let playerPos = { x: width / 4, y: height / 2 };
         let playerAngle = 0;
@@ -42,6 +46,10 @@
         const numRays = 120;
         const viewAngle = Math.PI / 3;
         const maxDistance = 800;
+        let playerHP = 3;
+        let opponentHP = 3;
+        let canShoot = true;
+        let lastShotTime = 0;
 
         let redWall = { x: 200, y: 200, w: 30, h: 30, color: RED };
 
@@ -100,6 +108,12 @@
                 ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
                 ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
+
+            // Draw the center point
+            ctx.fillStyle = YELLOW;
+            ctx.beginPath();
+            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         function update() {
@@ -142,6 +156,31 @@
             }
         }
 
+        function shoot() {
+            if (!canShoot) return;
+            canShoot = false;
+            lastShotTime = Date.now();
+            const { distance, color } = rayCasting(playerPos, playerAngle);
+            if (color === RED) {
+                socket.send(JSON.stringify({ action: 'shoot' }));
+                redWall.color = PURPLE;
+                setTimeout(() => {
+                    redWall.color = RED;
+                }, 1000);
+            }
+            setTimeout(() => {
+                canShoot = true;
+            }, 2000);
+        }
+
+        function checkGameOver() {
+            if (playerHP <= 0) {
+                alert('Ты проиграл');
+            } else if (opponentHP <= 0) {
+                alert('Ты победил');
+            }
+        }
+
         function gameLoop() {
             movePlayer();
             draw();
@@ -155,13 +194,27 @@
             }
         }
 
-        const socket = new WebSocket('wss://013a-212-58-119-152.ngrok-free.app');
+        const socket = new WebSocket('wss://458f-212-58-119-152.ngrok-free.app');
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             redWall.x = data.wallPosition.x;
             redWall.y = data.wallPosition.y;
+            if (data.playerHP !== undefined) {
+                playerHP = data.playerHP;
+                document.getElementById('hpDisplay').innerText = `HP: ${playerHP}`;
+            }
+            if (data.opponentHP !== undefined) {
+                opponentHP = data.opponentHP;
+            }
+            checkGameOver();
         };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                shoot();
+            }
+        });
 
         gameLoop();
     </script>
