@@ -196,13 +196,19 @@
         }
 
         function checkGameOver() {
-            if (playerHP <= 0) {
-                alert('Ты проиграл');
-                resetGame();
-            } else if (opponentHP <= 0) {
-                alert('Ты победил');
-                resetGame();
-            }
+    if (playerHP <= 0) {
+        displayMessage('Ты проиграл');
+        setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+    } else if (opponentHP <= 0) {
+        displayMessage('Ты победил');
+        setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+    }
+}
+
+function displayMessage(message) {
+    var messageElement = document.getElementById('message');
+    messageElement.textContent = message.toUpperCase(); // Выводим текст большими буквами
+}
         }
 
         function resetGame() {
