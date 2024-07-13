@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%; /* Позиционирование по вертикали на половину экрана */
-            left: 50%; /* Позиционирование по горизонтали на половину экрана */
-            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
-            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none; /* Начально скрываем элемент */
+            display: none;
         }
     </style>
 </head>
@@ -50,14 +50,11 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
-        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
         document.addEventListener('keydown', function(event) {
-            // Проверяем нажатую клавишу
             if (event.key === ' ') {
-                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
@@ -98,7 +95,7 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall // Красный куб
+            redWall
         ];
 
         const corners = [];
@@ -138,13 +135,12 @@
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
-                const wallHeight = height * (1 - Math.sqrt(distance / maxDistance));
+                const wallHeight = height * (1 - distance / maxDistance);
                 const shade = 255 - Math.floor(distance * 255 / maxDistance);
                 ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
                 ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
 
-            // Draw the center point
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
@@ -209,25 +205,24 @@
         }
 
         function checkGameOver() {
-        if (playerHP <= 0) {
-            displayMessage('Ты проиграл');
-            setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
-        } else if (opponentHP <= 0) {
-            displayMessage('Ты победил');
-            setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+            if (playerHP <= 0) {
+                displayMessage('Ты проиграл');
+                setTimeout(resetGame, 3000);
+            } else if (opponentHP <= 0) {
+                displayMessage('Ты победил');
+                setTimeout(resetGame, 3000);
             }
         }
-        
-    
+
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
-            messageContainer.style.display = 'block'; // Показываем элемент сообщений
+            messageContainer.textContent = message.toUpperCase();
+            messageContainer.style.display = 'block';
         }
-        
+
         function resetGame() {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.style.display = 'none'
+            messageContainer.style.display = 'none';
             playerHP = 3;
             opponentHP = 3;
             playerPos = { x: width / 4, y: height / 2 };
