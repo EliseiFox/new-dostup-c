@@ -68,24 +68,29 @@
         const width = canvas.width;
         const height = canvas.height;
 
-        const BLACK = 'black';
-        const YELLOW = 'yellow';
-        const RED = 'red';
-        const PURPLE = 'purple';
+        const COLORS = {
+            BLACK: 'black',
+            YELLOW: 'yellow',
+            RED: 'red',
+            PURPLE: 'purple'
+        };
 
-        let playerPos = { x: width / 4, y: height / 2 };
-        let playerAngle = 0;
-        const playerSpeed = 2;
-        const angleSpeed = 0.02;
-        const numRays = 1000;
+        const player = {
+            pos: { x: width / 4, y: height / 2 },
+            angle: 0,
+            speed: 2,
+            angleSpeed: 0.02,
+            hp: 3
+        };
+
+        const numRays = 120;
         const viewAngle = Math.PI / 3;
         const maxDistance = 800;
-        let playerHP = 3;
         let opponentHP = 3;
         let canShoot = true;
         let lastShotTime = 0;
 
-        let redWall = { x: 200, y: 200, w: 30, h: 30, color: RED };
+        const redWall = { x: 200, y: 200, w: 30, h: 30, color: COLORS.RED };
 
         const obstacles = [
             { x: 0, y: 0, w: width, h: 10 },
@@ -100,43 +105,50 @@
             redWall
         ];
 
+        const corners = obstacles.flatMap(rect => [
+            { x: rect.x, y: rect.y },
+            { x: rect.x + rect.w, y: rect.y },
+            { x: rect.x, y: rect.y + rect.h },
+            { x: rect.x + rect.w, y: rect.y + rect.h }
+        ]);
+
         function rayCasting(playerPos, angle) {
-            const dx = Math.cos(angle);
-            const dy = Math.sin(angle);
-            let distance = 0;
             let x = playerPos.x;
             let y = playerPos.y;
-
-            while (distance < maxDistance) {
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            for (let distance = 0; distance < maxDistance; distance++) {
                 x += dx;
                 y += dy;
-                distance++;
+                if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
+                    return { distance, isCorner: true };
+                }
                 for (let rect of obstacles) {
                     if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
-                        return { distance, color: rect.color };
+                        return { distance, isCorner: false, color: rect.color };
                     }
                 }
             }
-            return { distance: maxDistance, color: null };
+            return { distance: maxDistance, isCorner: false, color: null };
         }
 
         function draw() {
-            ctx.fillStyle = BLACK;
+            ctx.fillStyle = COLORS.BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            const startAngle = playerAngle - viewAngle / 2;
+            const startAngle = player.angle - viewAngle / 2;
 
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
-                const { distance, color } = rayCasting(playerPos, rayAngle);
-                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
+                const { distance, isCorner, color } = rayCasting(player.pos, rayAngle);
+                const correctedDistance = distance * Math.cos(rayAngle - player.angle);
                 const wallHeight = height / correctedDistance * 100;
                 const shade = 255 - Math.floor(distance * 255 / maxDistance);
-                ctx.fillStyle = color || `rgb(${shade},${shade},${shade})`;
+                ctx.fillStyle = color || (isCorner ? COLORS.YELLOW : `rgb(${shade},${shade},${shade})`);
                 ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
 
-            ctx.fillStyle = YELLOW;
+            ctx.fillStyle = COLORS.YELLOW;
             ctx.beginPath();
             ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
             ctx.fill();
@@ -158,40 +170,40 @@
         });
 
         function checkCollision(x, y) {
-            return obstacles.some(rect => 
+            return obstacles.some(rect =>
                 x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
             );
         }
 
         function movePlayer() {
-            let newPos = { x: playerPos.x, y: playerPos.y };
+            let newPos = { x: player.pos.x, y: player.pos.y };
 
             if (keys['KeyW']) {
-                newPos.x += playerSpeed * Math.cos(playerAngle);
-                newPos.y += playerSpeed * Math.sin(playerAngle);
+                newPos.x += player.speed * Math.cos(player.angle);
+                newPos.y += player.speed * Math.sin(player.angle);
             }
             if (keys['KeyS']) {
-                newPos.x -= playerSpeed * Math.cos(playerAngle);
-                newPos.y -= playerSpeed * Math.sin(playerAngle);
+                newPos.x -= player.speed * Math.cos(player.angle);
+                newPos.y -= player.speed * Math.sin(player.angle);
             }
             if (keys['KeyA']) {
-                newPos.x += playerSpeed * Math.cos(playerAngle - Math.PI / 2);
-                newPos.y += playerSpeed * Math.sin(playerAngle - Math.PI / 2);
+                newPos.x += player.speed * Math.cos(player.angle - Math.PI / 2);
+                newPos.y += player.speed * Math.sin(player.angle - Math.PI / 2);
             }
             if (keys['KeyD']) {
-                newPos.x += playerSpeed * Math.cos(playerAngle + Math.PI / 2);
-                newPos.y += playerSpeed * Math.sin(playerAngle + Math.PI / 2);
+                newPos.x += player.speed * Math.cos(player.angle + Math.PI / 2);
+                newPos.y += player.speed * Math.sin(player.angle + Math.PI / 2);
             }
 
             if (!checkCollision(newPos.x, newPos.y)) {
-                playerPos = newPos;
+                player.pos = newPos;
             }
 
             if (keys['ArrowLeft']) {
-                playerAngle -= angleSpeed;
+                player.angle -= player.angleSpeed;
             }
             if (keys['ArrowRight']) {
-                playerAngle += angleSpeed;
+                player.angle += player.angleSpeed;
             }
         }
 
@@ -199,12 +211,12 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            const { distance, color } = rayCasting(playerPos, playerAngle);
-            if (color === RED) {
+            const { distance, color } = rayCasting(player.pos, player.angle);
+            if (color === COLORS.RED) {
                 socket.send(JSON.stringify({ action: 'shoot' }));
-                redWall.color = PURPLE;
+                redWall.color = COLORS.PURPLE;
                 setTimeout(() => {
-                    redWall.color = RED;
+                    redWall.color = COLORS.RED;
                 }, 1000);
             }
             setTimeout(() => {
@@ -213,7 +225,7 @@
         }
 
         function checkGameOver() {
-            if (playerHP <= 0) {
+            if (player.hp <= 0) {
                 displayMessage('Ты проиграл');
                 setTimeout(resetGame, 3000);
             } else if (opponentHP <= 0) {
@@ -223,18 +235,18 @@
         }
 
         function displayMessage(message) {
-            var messageContainer = document.getElementById('messageContainer');
+            const messageContainer = document.getElementById('messageContainer');
             messageContainer.textContent = message.toUpperCase();
             messageContainer.style.display = 'block';
         }
 
         function resetGame() {
-            var messageContainer = document.getElementById('messageContainer');
+            const messageContainer = document.getElementById('messageContainer');
             messageContainer.style.display = 'none';
-            playerHP = 3;
+            player.hp = 3;
             opponentHP = 3;
-            playerPos = { x: width / 4, y: height / 2 };
-            playerAngle = 0;
+            player.pos = { x: width / 4, y: height / 2 };
+            player.angle = 0;
             socket.send(JSON.stringify({ action: 'reset' }));
         }
 
@@ -247,7 +259,7 @@
 
         function sendPosition() {
             if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ position: playerPos }));
+                socket.send(JSON.stringify({ position: player.pos }));
             }
         }
 
@@ -258,8 +270,8 @@
             redWall.x = data.wallPosition.x;
             redWall.y = data.wallPosition.y;
             if (data.playerHP !== undefined) {
-                playerHP = data.playerHP;
-                document.getElementById('hpDisplay').innerText = `HP: ${playerHP}`;
+                player.hp = data.playerHP;
+                document.getElementById('hpDisplay').innerText = `HP: ${player.hp}`;
             }
             if (data.opponentHP !== undefined) {
                 opponentHP = data.opponentHP;
