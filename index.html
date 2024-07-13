@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Ray Casting with Multiplayer</title>
     <style>
+        .open-link-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
         body {
             margin: 0;
             overflow: hidden;
@@ -23,9 +33,18 @@
     </style>
 </head>
 <body>
+    <button class="open-link-button" onclick="openAnotherSite()">Open Site</button>
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
+        window.onload = function() {
+            window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
+        }
+
+        // Функция для открытия сайта в новой вкладке по нажатию кнопки
+        function openAnotherSite() {
+            window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
+        }
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
