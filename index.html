@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
+            top: 50%; /* Позиционирование по вертикали на половину экрана */
+            left: 50%; /* Позиционирование по горизонтали на половину экрана */
+            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
+            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none;
+            display: none; /* Начально скрываем элемент */
         }
     </style>
 </head>
@@ -50,11 +50,14 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
+        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
         document.addEventListener('keydown', function(event) {
+            // Проверяем нажатую клавишу
             if (event.key === ' ') {
+                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
@@ -62,8 +65,10 @@
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+
         const width = canvas.width;
         const height = canvas.height;
+
         const BLACK = 'black';
         const YELLOW = 'yellow';
         const RED = 'red';
@@ -93,7 +98,7 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall
+            redWall // Красный куб
         ];
 
         const corners = [];
@@ -134,23 +139,10 @@
                 const rayAngle = startAngle + viewAngle * i / numRays;
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
                 const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
-                const wallHeight = Math.min(height, (height / correctedDistance) * maxDistance);
-                const shade = 255 - Math.floor(correctedDistance * 255 / maxDistance);
-
-                const wallTop = height / 2 - wallHeight / 2;
-                const wallBottom = height / 2 + wallHeight / 2;
-
-                // Draw wall
+                const wallHeight = height / correctedDistance * 100;
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
                 ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
-                ctx.fillRect(i * width / numRays, wallTop, width / numRays, wallHeight);
-
-                // Draw floor
-                ctx.fillStyle = `rgb(${shade * 0.5}, ${shade * 0.5}, ${shade * 0.5})`;
-                ctx.fillRect(i * width / numRays, wallBottom, width / numRays, height - wallBottom);
-
-                // Draw ceiling
-                ctx.fillStyle = `rgb(${shade * 0.75}, ${shade * 0.75}, ${shade * 0.75})`;
-                ctx.fillRect(i * width / numRays, 0, width / numRays, wallTop);
+                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
 
             // Draw the center point
@@ -220,17 +212,17 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000);
+                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
             } else if (opponentHP <= 0) {
                 displayMessage('Ты победил');
-                setTimeout(resetGame, 3000);
+                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
             }
         }
 
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase();
-            messageContainer.style.display = 'block';
+            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
+            messageContainer.style.display = 'block'; // Показываем элемент сообщений
         }
 
         function resetGame() {
