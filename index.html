@@ -217,15 +217,16 @@
             setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
             }
         }
-        setTimeout(function() {
-                messageContainer.style.display = 'none'; // Скрываем сообщение через 3 секунды
-            }, 3000);
-        }
+        
     
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
             messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
             messageContainer.style.display = 'block'; // Показываем элемент сообщений
+        }
+        setTimeout(function() {
+                messageContainer.style.display = 'none'; // Скрываем сообщение через 3 секунды
+            }, 3000);
         }
 
         function resetGame() {
