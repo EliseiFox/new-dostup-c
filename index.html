@@ -133,13 +133,27 @@
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
-                const correctedDistance = distance * Math.cos(rayAngle - playerAngle); // Correcting the distance for fish-eye effect
+                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
                 const wallHeight = Math.min(height, (height / correctedDistance) * maxDistance);
                 const shade = 255 - Math.floor(correctedDistance * 255 / maxDistance);
+
+                const wallTop = height / 2 - wallHeight / 2;
+                const wallBottom = height / 2 + wallHeight / 2;
+
+                // Draw wall
                 ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
-                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+                ctx.fillRect(i * width / numRays, wallTop, width / numRays, wallHeight);
+
+                // Draw floor
+                ctx.fillStyle = `rgb(${shade * 0.5}, ${shade * 0.5}, ${shade * 0.5})`;
+                ctx.fillRect(i * width / numRays, wallBottom, width / numRays, height - wallBottom);
+
+                // Draw ceiling
+                ctx.fillStyle = `rgb(${shade * 0.75}, ${shade * 0.75}, ${shade * 0.75})`;
+                ctx.fillRect(i * width / numRays, 0, width / numRays, wallTop);
             }
 
+            // Draw the center point
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
