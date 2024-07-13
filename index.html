@@ -113,47 +113,71 @@
         ]);
 
         function rayCasting(playerPos, angle) {
-            let x = playerPos.x;
-            let y = playerPos.y;
-            const dx = Math.cos(angle);
-            const dy = Math.sin(angle);
-            for (let distance = 0; distance < maxDistance; distance++) {
-                x += dx;
-                y += dy;
-                if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
-                    return { distance, isCorner: true };
-                }
-                for (let rect of obstacles) {
-                    if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
-                        return { distance, isCorner: false, color: rect.color };
-                    }
-                }
-            }
-            return { distance: maxDistance, isCorner: false, color: null };
+    let x = playerPos.x;
+    let y = playerPos.y;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    for (let distance = 0; distance < maxDistance; distance++) {
+        x += dx;
+        y += dy;
+        if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
+            return { distance, isCorner: true };
         }
+        for (let rect of obstacles) {
+            if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
+                return { distance, isCorner: false, color: rect.color, hitX: x, hitY: y };
+            }
+        }
+    }
+    return { distance: maxDistance, isCorner: false, color: null, hitX: x, hitY: y };
+}
 
+                // Load textures
+        const textures = {
+            wall: new Image()
+        };
+        textures.wall.src = 'path/to/your/texture.png'; // Specify your texture image path
+        
+        // Ensure textures are loaded before rendering
+        textures.wall.onload = () => {
+            gameLoop(); // Start the game loop only after textures are loaded
+        };
+        
         function draw() {
             ctx.fillStyle = COLORS.BLACK;
             ctx.fillRect(0, 0, width, height);
-
+        
             const startAngle = player.angle - viewAngle / 2;
-
+        
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
-                const { distance, isCorner, color } = rayCasting(player.pos, rayAngle);
+                const { distance, isCorner, color, hitX, hitY } = rayCasting(player.pos, rayAngle);
                 const correctedDistance = distance * Math.cos(rayAngle - player.angle);
                 const wallHeight = height / correctedDistance * 100;
                 const shade = 255 - Math.floor(distance * 255 / maxDistance);
-                ctx.fillStyle = color || (isCorner ? COLORS.YELLOW : `rgb(${shade},${shade},${shade})`);
-                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+        
+                if (color) {
+                    // Calculate texture coordinates
+                    const texX = Math.floor(hitX % textures.wall.width);
+                    const texY = Math.floor(hitY % textures.wall.height);
+                    const sliceWidth = textures.wall.width / numRays;
+        
+                    // Draw texture slice
+                    ctx.drawImage(
+                        textures.wall, 
+                        texX, 0, sliceWidth, textures.wall.height, // Source
+                        i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight // Destination
+                    );
+                } else {
+                    ctx.fillStyle = isCorner ? COLORS.YELLOW : `rgb(${shade},${shade},${shade})`;
+                    ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+                }
             }
-
-            ctx.fillStyle = COLORS.YELLOW;
+                    ctx.fillStyle = COLORS.YELLOW;
             ctx.beginPath();
             ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
             ctx.fill();
         }
-
         function update() {
             draw();
             requestAnimationFrame(update);
