@@ -32,15 +32,36 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
+            top: 50%; /* Позиционирование по вертикали на половину экрана */
+            left: 50%; /* Позиционирование по горизонтали на половину экрана */
+            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
+            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
+            display: none; /* Начально скрываем элемент */
+        }
+        .mobile-controls {
             display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            justify-content: space-around;
+        }
+        .mobile-button {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: black;
+            user-select: none;
         }
     </style>
 </head>
@@ -49,10 +70,18 @@
     <button class="open-link-button no-select" onclick="openAnotherSite()">Open Site</button>
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
+    <div id="mobileControls" class="mobile-controls">
+        <div class="mobile-button" id="moveUp">↑</div>
+        <div class="mobile-button" id="moveLeft">←</div>
+        <div class="mobile-button" id="moveRight">→</div>
+        <div class="mobile-button" id="moveDown">↓</div>
+        <div class="mobile-button" id="shoot">Shoot</div>
+    </div>
     <script>
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
+        
         document.addEventListener('keydown', function(event) {
             if (event.key === ' ') {
                 event.preventDefault();
@@ -112,34 +141,19 @@
             let y = playerPos.y;
             const dx = Math.cos(angle);
             const dy = Math.sin(angle);
-            const gridSize = 64; // Assuming grid size of 64 pixels
-
-            while (true) {
-                const stepX = dx > 0 ? Math.floor(x / gridSize) * gridSize + gridSize - x : Math.ceil(x / gridSize) * gridSize - x;
-                const stepY = dy > 0 ? Math.floor(y / gridSize) * gridSize + gridSize - y : Math.ceil(y / gridSize) * gridSize - y;
-                const deltaX = stepX / dx;
-                const deltaY = stepY / dy;
-
-                if (deltaX < deltaY) {
-                    x += stepX;
-                    y += stepX * dy / dx;
-                } else {
-                    x += stepY * dx / dy;
-                    y += stepY;
+            for (let distance = 0; distance < maxDistance; distance++) {
+                x += dx;
+                y += dy;
+                if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
+                    return { distance, isCorner: true };
                 }
-
                 for (let rect of obstacles) {
                     if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
-                        return { distance: Math.sqrt((x - playerPos.x) ** 2 + (y - playerPos.y) ** 2), color: rect.color };
+                        return { distance, isCorner: false, color: rect.color };
                     }
                 }
-
-                if (x < 0 || y < 0 || x > width || y > height) {
-                    break;
-                }
             }
-
-            return { distance: maxDistance, color: null };
+            return { distance: maxDistance, isCorner: false, color: null };
         }
 
         function draw() {
@@ -150,11 +164,11 @@
 
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
-                const { distance, color } = rayCasting(playerPos, rayAngle);
+                const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
                 const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
                 const wallHeight = height / correctedDistance * 100;
                 const shade = 255 - Math.floor(distance * 255 / maxDistance);
-                ctx.fillStyle = color || `rgb(${shade},${shade},${shade})`;
+                ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
                 ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
 
@@ -281,3 +295,40 @@
                 shoot();
             }
         });
+
+        function detectMobile() {
+            return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        function requestFullScreen() {
+            if (canvas.requestFullscreen) {
+                canvas.requestFullscreen();
+            } else if (canvas.mozRequestFullScreen) { // Firefox
+                canvas.mozRequestFullScreen();
+            } else if (canvas.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                canvas.webkitRequestFullscreen();
+            } else if (canvas.msRequestFullscreen) { // IE/Edge
+                canvas.msRequestFullscreen();
+            }
+        }
+
+        if (detectMobile()) {
+            requestFullScreen();
+            document.getElementById('mobileControls').style.display = 'flex';
+
+            document.getElementById('moveUp').addEventListener('touchstart', () => keys['KeyW'] = true);
+            document.getElementById('moveUp').addEventListener('touchend', () => keys['KeyW'] = false);
+            document.getElementById('moveLeft').addEventListener('touchstart', () => keys['KeyA'] = true);
+            document.getElementById('moveLeft').addEventListener('touchend', () => keys['KeyA'] = false);
+            document.getElementById('moveRight').addEventListener('touchstart', () => keys['KeyD'] = true);
+            document.getElementById('moveRight').addEventListener('touchend', () => keys['KeyD'] = false);
+            document.getElementById('moveDown').addEventListener('touchstart', () => keys['KeyS'] = true);
+            document.getElementById('moveDown').addEventListener('touchend', () => keys['KeyS'] = false);
+            document.getElementById('shoot').addEventListener('touchstart', () => shoot());
+        }
+
+        update();
+        gameLoop();
+    </script>
+</body>
+</html>
