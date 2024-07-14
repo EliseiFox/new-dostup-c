@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%; /* Позиционирование по вертикали на половину экрана */
-            left: 50%; /* Позиционирование по горизонтали на половину экрана */
-            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
-            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none; /* Начально скрываем элемент */
+            display: none;
         }
     </style>
 </head>
@@ -50,17 +50,16 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
-        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
+
         document.addEventListener('keydown', function(event) {
-            // Проверяем нажатую клавишу
             if (event.key === ' ') {
-                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -97,126 +96,60 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall // Красный куб
+            redWall
         ];
 
-        const corners = [];
-        obstacles.forEach(rect => {
-            corners.push({ x: rect.x, y: rect.y });
-            corners.push({ x: rect.x + rect.w, y: rect.y });
-            corners.push({ x: rect.x, y: rect.y + rect.h });
-            corners.push({ x: rect.x + rect.w, y: rect.y + rect.h });
-        });
-
-        function getVisiblePolygon(playerPos) {
-            let visibilityPolygon = [];
-
-            corners.forEach(corner => {
-                let angle = Math.atan2(corner.y - playerPos.y, corner.x - playerPos.x);
-                
-                for (let i = -0.01; i <= 0.01; i += 0.01) {
-                    let testAngle = angle + i;
-                    let dx = Math.cos(testAngle);
-                    let dy = Math.sin(testAngle);
-
-                    let ray = {
-                        x: playerPos.x,
-                        y: playerPos.y,
-                        angle: testAngle,
-                        distance: maxDistance
-                    };
-
-                    for (let rect of obstacles) {
-                        let intersections = getRectIntersections(ray, rect);
-                        intersections.forEach(intersection => {
-                            let dist = Math.sqrt((intersection.x - playerPos.x) ** 2 + (intersection.y - playerPos.y) ** 2);
-                            if (dist < ray.distance) {
-                                ray.distance = dist;
-                                ray.x = intersection.x;
-                                ray.y = intersection.y;
-                            }
-                        });
-                    }
-                    visibilityPolygon.push({ x: ray.x, y: ray.y });
-                }
+        function getVisibilityPolygon(position, obstacles) {
+            const segments = [];
+            obstacles.forEach(rect => {
+                segments.push([{ x: rect.x, y: rect.y }, { x: rect.x + rect.w, y: rect.y }]);
+                segments.push([{ x: rect.x + rect.w, y: rect.y }, { x: rect.x + rect.w, y: rect.y + rect.h }]);
+                segments.push([{ x: rect.x + rect.w, y: rect.y + rect.h }, { x: rect.x, y: rect.y + rect.h }]);
+                segments.push([{ x: rect.x, y: rect.y + rect.h }, { x: rect.x, y: rect.y }]);
             });
 
-            visibilityPolygon.sort((a, b) => Math.atan2(a.y - playerPos.y, a.x - playerPos.x) - Math.atan2(b.y - playerPos.y, b.x - playerPos.x));
-            return visibilityPolygon;
-        }
-
-        function getRectIntersections(ray, rect) {
-            let intersections = [];
-
-            let lines = [
-                { x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y },
-                { x1: rect.x + rect.w, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-                { x1: rect.x + rect.w, y1: rect.y + rect.h, x2: rect.x, y2: rect.y + rect.h },
-                { x1: rect.x, y1: rect.y + rect.h, x2: rect.x, y2: rect.y }
-            ];
-
-            lines.forEach(line => {
-                let intersection = getLineIntersection(ray, line);
-                if (intersection) {
-                    intersections.push(intersection);
-                }
+            const uniquePoints = [...new Set(segments.flat().map(p => `${p.x},${p.y}`))].map(p => {
+                const [x, y] = p.split(',').map(Number);
+                return { x, y };
             });
 
-            return intersections;
-        }
+            const angles = uniquePoints.map(p => Math.atan2(p.y - position.y, p.x - position.x));
 
-        function getLineIntersection(ray, line) {
-            let r_px = ray.x;
-            let r_py = ray.y;
-            let r_dx = Math.cos(ray.angle);
-            let r_dy = Math.sin(ray.angle);
+            const points = angles.flatMap(angle => {
+                const dx = Math.cos(angle);
+                const dy = Math.sin(angle);
+                const intersections = segments.map(([a, b]) => {
+                    const t2 = (dx * (a.y - position.y) + dy * (position.x - a.x)) / (dx * (a.y - b.y) - dy * (a.x - b.x));
+                    const t1 = (a.x + t2 * (b.x - a.x) - position.x) / dx;
+                    if (t1 > 0 && t2 >= 0 && t2 <= 1) return { x: position.x + t1 * dx, y: position.y + t1 * dy };
+                    return null;
+                }).filter(Boolean);
+                return intersections.sort((a, b) => Math.hypot(a.x - position.x, a.y - position.y) - Math.hypot(b.x - position.x, b.y - position.y))[0];
+            });
 
-            let s_px = line.x1;
-            let s_py = line.y1;
-            let s_dx = line.x2 - line.x1;
-            let s_dy = line.y2 - line.y1;
-
-            let r_mag = Math.sqrt(r_dx ** 2 + r_dy ** 2);
-            let s_mag = Math.sqrt(s_dx ** 2 + s_dy ** 2);
-            if (r_dx / r_mag == s_dx / s_mag && r_dy / r_mag == s_dy / s_mag) {
-                return null;
-            }
-
-            let T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
-            let T1 = (s_px + s_dx * T2 - r_px) / r_dx;
-
-            if (T1 < 0) return null;
-            if (T2 < 0 || T2 > 1) return null;
-
-            return {
-                x: r_px + r_dx * T1,
-                y: r_py + r_dy * T1,
-                distance: T1
-            };
+            return points.filter(Boolean).sort((a, b) => Math.atan2(a.y - position.y, a.x - position.x) - Math.atan2(b.y - position.y, b.x - position.x));
         }
 
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            let visiblePolygon = getVisiblePolygon(playerPos);
+            const polygon = getVisibilityPolygon(playerPos, obstacles);
 
             ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
             ctx.beginPath();
-            ctx.moveTo(playerPos.x, playerPos.y);
-            visiblePolygon.forEach(point => {
-                ctx.lineTo(point.x, point.y);
-            });
+            ctx.moveTo(polygon[0].x, polygon[0].y);
+            polygon.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.closePath();
             ctx.fill();
 
             // Draw obstacles
             obstacles.forEach(rect => {
-                ctx.fillStyle = rect.color || 'grey';
+                ctx.fillStyle = rect.color || 'gray';
                 ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
             });
 
-            // Draw the center point
+            // Draw the player
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
@@ -267,23 +200,14 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            let visiblePolygon = getVisiblePolygon(playerPos);
-            visiblePolygon.forEach(point => {
-                let dist = Math.sqrt((point.x - playerPos.x) ** 2 + (point.y - playerPos.y) ** 2);
-                if (dist < maxDistance) {
-                    obstacles.forEach(rect => {
-                        if (point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h) {
-                            if (rect.color === RED) {
-                                socket.send(JSON.stringify({ action: 'shoot' }));
-                                rect.color = PURPLE;
-                                setTimeout(() => {
-                                    rect.color = RED;
-                                }, 1000);
-                            }
-                        }
-                    });
-                }
-            });
+            const polygon = getVisibilityPolygon(playerPos, obstacles);
+            if (polygon.some(p => p.x >= redWall.x && p.x <= redWall.x + redWall.w && p.y >= redWall.y && p.y <= redWall.y + redWall.h)) {
+                socket.send(JSON.stringify({ action: 'shoot' }));
+                redWall.color = PURPLE;
+                setTimeout(() => {
+                    redWall.color = RED;
+                }, 1000);
+            }
             setTimeout(() => {
                 canShoot = true;
             }, 2000);
@@ -292,17 +216,17 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             } else if (opponentHP <= 0) {
                 displayMessage('Ты победил');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             }
         }
 
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
-            messageContainer.style.display = 'block'; // Показываем элемент сообщений
+            messageContainer.textContent = message.toUpperCase();
+            messageContainer.style.display = 'block';
         }
 
         function resetGame() {
