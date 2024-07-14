@@ -77,6 +77,7 @@
         let playerAngle = 0;
         const playerSpeed = 2;
         const angleSpeed = 0.02;
+        const fov = Math.PI / 3; // Field of view
         const maxDistance = 800;
         let playerHP = 3;
         let opponentHP = 3;
@@ -186,23 +187,24 @@
             return points;
         }
 
+        function draw3D(points) {
+            const sliceWidth = width / points.length;
+            points.forEach((point, i) => {
+                const angle = Math.atan2(point.y - playerPos.y, point.x - playerPos.x) - playerAngle;
+                const distance = Math.sqrt((point.x - playerPos.x) ** 2 + (point.y - playerPos.y) ** 2) * Math.cos(angle);
+                const wallHeight = (height / distance) * 100;
+                const shade = 255 - Math.floor((distance / maxDistance) * 255);
+                ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                ctx.fillRect(i * sliceWidth, (height / 2) - (wallHeight / 2), sliceWidth, wallHeight);
+            });
+        }
+
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
             const points = getSightPolygon(playerPos.x, playerPos.y);
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            points.forEach(point => ctx.lineTo(point.x, point.y));
-            ctx.closePath();
-            ctx.fill();
-
-            // Draw obstacles
-            obstacles.forEach(obstacle => {
-                ctx.fillStyle = obstacle.color || 'grey';
-                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
-            });
+            draw3D(points);
 
             // Draw player
             ctx.fillStyle = YELLOW;
