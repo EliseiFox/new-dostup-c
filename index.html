@@ -130,40 +130,55 @@
         }
 
         function draw() {
-            ctx.fillStyle = BLACK;
-            ctx.fillRect(0, 0, width, height);
-        
-            const startAngle = playerAngle - viewAngle / 2;
-            const columns = [];
-        
-            for (let i = 0; i < numRays; i++) {
-                const rayAngle = startAngle + viewAngle * i / numRays;
-                const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
-                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
-                const wallHeight = height / correctedDistance * 100;
-                const shade = 255 - Math.floor(distance * 255 / maxDistance);
-                const columnColor = color || (isCorner? YELLOW : `rgb(${shade},${shade},${shade})`);
-                columns.push({
-                    x: i * width / numRays,
-                    y: height / 2 - wallHeight / 2,
-                    w: width / numRays,
-                    h: wallHeight,
-                    color: columnColor
-                });
-            }
+  ctx.clearRect(0, 0, width, height);
 
-    ctx.beginPath();
-    for (const column of columns) {
-        ctx.fillStyle = column.color;
-        ctx.fillRect(column.x, column.y, column.w, column.h);
+  // Calculate the polygons
+  const polygons = [];
+  for (let i = 0; i < cubeCorners.length; i++) {
+    const corner1 = cubeCorners[i];
+    const corner2 = cubeCorners[(i + 1) % cubeCorners.length];
+    const normal = calculateNormal(corner1, corner2);
+    polygons.push({
+      vertices: [corner1, corner2],
+      normal: normal
+    });
+  }
+
+  // Calculate the distances
+  for (let i = 0; i < polygons.length; i++) {
+    const polygon = polygons[i];
+    const distance = calculateDistance(playerPos, polygon.normal);
+    polygon.distance = distance;
+  }
+
+  // Create a 3D projection
+  const lines = [];
+  for (let i = 0; i < polygons.length; i++) {
+    const polygon = polygons[i];
+    for (let j = 0; j < polygon.vertices.length; j++) {
+      const vertex1 = polygon.vertices[j];
+      const vertex2 = polygon.vertices[(j + 1) % polygon.vertices.length];
+      const depth1 = polygon.distance;
+      const depth2 = calculateDistance(playerPos, polygon.normal, vertex2);
+      lines.push({
+        x1: vertex1.x,
+        y1: vertex1.y,
+        x2: vertex2.x,
+        y2: vertex2.y,
+        depth1: depth1,
+        depth2: depth2
+      });
     }
-    ctx.fill();
+  }
 
-    // Draw the center point
-    ctx.fillStyle = YELLOW;
-    ctx.beginPath();
-    ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
-    ctx.fill();
+  // Render the scene
+  ctx.beginPath();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    ctx.moveTo(line.x1, line.y1);
+    ctx.lineTo(line.x2, line.y2);
+  }
+  ctx.stroke();
 }
 
         function update() {
