@@ -327,18 +327,6 @@
             document.getElementById('moveRight').addEventListener('touchend', () => keys['KeyD'] = false);
             document.getElementById('moveDown').addEventListener('touchstart', () => keys['KeyS'] = true);
             document.getElementById('moveDown').addEventListener('touchend', () => keys['KeyS'] = false);
-            document.getElementById('rotateLeft').addEventListener('touchstart', () => {
-                keys['ArrowLeft'] = true;
-            });
-            document.getElementById('rotateLeft').addEventListener('touchend', () => {
-                keys['ArrowLeft'] = false;
-            });
-            document.getElementById('rotateRight').addEventListener('touchstart', () => {
-                keys['ArrowRight'] = true;
-            });
-            document.getElementById('rotateRight').addEventListener('touchend', () => {
-                keys['ArrowRight'] = false;
-            });
             document.getElementById('shoot').addEventListener('touchstart', () => shoot());
         }
 
