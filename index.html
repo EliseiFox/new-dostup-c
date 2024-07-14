@@ -77,6 +77,7 @@
         const angleSpeed = 0.02;
         const viewAngle = Math.PI / 3;
         const maxDistance = 800;
+        const numRays = 120;
         let playerHP = 3;
         let opponentHP = 3;
         let canShoot = true;
@@ -170,31 +171,48 @@
             return null;
         }
 
+        function rayCasting(playerPos, angle) {
+            const visibilityPolygon = drawVisibilityPolygon(playerPos.x, playerPos.y, obstacles);
+            let closestDistance = maxDistance;
+            let hitColor = null;
+
+            for (let point of visibilityPolygon) {
+                const dx = point.x - playerPos.x;
+                const dy = point.y - playerPos.y;
+                const rayAngle = Math.atan2(dy, dx);
+
+                if (Math.abs(rayAngle - angle) < 0.0001) {
+                    const distance = Math.hypot(dx, dy);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        hitColor = point.color || null;
+                    }
+                }
+            }
+
+            return { distance: closestDistance, color: hitColor };
+        }
+
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            const visibilityPolygon = drawVisibilityPolygon(playerPos.x, playerPos.y, obstacles);
+            const startAngle = playerAngle - viewAngle / 2;
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.beginPath();
-            ctx.moveTo(visibilityPolygon[0].x, visibilityPolygon[0].y);
-            for (let i = 1; i < visibilityPolygon.length; i++) {
-                ctx.lineTo(visibilityPolygon[i].x, visibilityPolygon[i].y);
-            }
-            ctx.closePath();
-            ctx.fill();
-
-            // Draw obstacles
-            for (let obstacle of obstacles) {
-                ctx.fillStyle = obstacle.color || BLACK;
-                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+            for (let i = 0; i < numRays; i++) {
+                const rayAngle = startAngle + viewAngle * i / numRays;
+                const { distance, color } = rayCasting(playerPos, rayAngle);
+                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
+                const wallHeight = height / correctedDistance * 100;
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                ctx.fillStyle = color || `rgb(${shade},${shade},${shade})`;
+                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
 
-            // Draw the player
+            // Draw the center point
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
-            ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
+            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -242,21 +260,13 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            const visibilityPolygon = drawVisibilityPolygon(playerPos.x, playerPos.y, obstacles);
-            for (let point of visibilityPolygon) {
-                const dx = point.x - playerPos.x;
-                const dy = point.y - playerPos.y;
-                const angle = Math.atan2(dy, dx);
-                if (Math.abs(angle - playerAngle) < 0.1) {
-                    if (point.color === RED) {
-                        socket.send(JSON.stringify({ action: 'shoot' }));
-                        redWall.color = PURPLE;
-                        setTimeout(() => {
-                            redWall.color = RED;
-                        }, 1000);
-                        break;
-                    }
-                }
+            const { distance, color } = rayCasting(playerPos, playerAngle);
+            if (color === RED) {
+                socket.send(JSON.stringify({ action: 'shoot' }));
+                redWall.color = PURPLE;
+                setTimeout(() => {
+                    redWall.color = RED;
+                }, 1000);
             }
             setTimeout(() => {
                 canShoot = true;
