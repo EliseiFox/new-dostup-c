@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
+            top: 50%; /* Позиционирование по вертикали на половину экрана */
+            left: 50%; /* Позиционирование по горизонтали на половину экрана */
+            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
+            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none;
+            display: none; /* Начально скрываем элемент */
         }
     </style>
 </head>
@@ -52,14 +52,15 @@
     <script>
         // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
-            window.open('https://6021-212-58-119-152.ngrok-free.app', '_blank');
+            window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
         document.addEventListener('keydown', function(event) {
+            // Проверяем нажатую клавишу
             if (event.key === ' ') {
+                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
-
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -97,7 +98,7 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall
+            redWall // Красный куб
         ];
 
         const corners = [];
@@ -139,11 +140,22 @@
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
                 const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
                 const wallHeight = height / correctedDistance * 100;
-                const shade = 255 - Math.floor(distance * 255 / maxDistance);
-                ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
-                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+
+                // Draw the wall as a curve
+                ctx.beginPath();
+                ctx.moveTo(i * width / numRays, height / 2 - wallHeight / 2);
+                for (let j = 0; j < 10; j++) {
+                    const x = i * width / numRays + j * width / (numRays * 10);
+                    const y = height / 2 - wallHeight / 2 + j * wallHeight / 10;
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo((i + 1) * width / numRays, height / 2 - wallHeight / 2);
+                ctx.closePath();
+                ctx.fillStyle = color || (isCorner? YELLOW : `rgb(${255 - Math.floor(distance * 255 / maxDistance)},${255 - Math.floor(distance * 255 / maxDistance)},${255 - Math.floor(distance * 255 / maxDistance)})`);
+                ctx.fill();
             }
 
+            // Draw the center point
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
@@ -184,7 +196,7 @@
             }
             if (keys['ArrowLeft']) {
                 playerAngle -= angleSpeed;
-            }
+           }
             if (keys['ArrowRight']) {
                 playerAngle += angleSpeed;
             }
@@ -196,7 +208,7 @@
             lastShotTime = Date.now();
             const { distance, color } = rayCasting(playerPos, playerAngle);
             if (color === RED) {
-                socket.send(JSON.stringify({ action: 'shoot' }));
+                socket.send(JSON.stringify({ action: 'hoot' }));
                 redWall.color = PURPLE;
                 setTimeout(() => {
                     redWall.color = RED;
@@ -210,17 +222,17 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000);
+                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
             } else if (opponentHP <= 0) {
                 displayMessage('Ты победил');
-                setTimeout(resetGame, 3000);
+                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
             }
         }
 
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase();
-            messageContainer.style.display = 'block';
+            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
+            messageContainer.style.display = 'block'; // Показываем элемент сообщений
         }
 
         function resetGame() {
@@ -230,7 +242,7 @@
             opponentHP = 3;
             playerPos = { x: width / 4, y: height / 2 };
             playerAngle = 0;
-            socket.send(JSON.stringify({ action: 'reset' }));
+            socket.send(JSON.stringify({ action: 'eset' }));
         }
 
         function gameLoop() {
@@ -246,17 +258,17 @@
             }
         }
 
-        const socket = new WebSocket('wss://6021-212-58-119-152.ngrok-free.app');
+        const socket = new WebSocket('wss://458f-212-58-119-152.ngrok-free.app');
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             redWall.x = data.wallPosition.x;
             redWall.y = data.wallPosition.y;
-            if (data.playerHP !== undefined) {
+            if (data.playerHP!== undefined) {
                 playerHP = data.playerHP;
                 document.getElementById('hpDisplay').innerText = `HP: ${playerHP}`;
             }
-            if (data.opponentHP !== undefined) {
+            if (data.opponentHP!== undefined) {
                 opponentHP = data.opponentHP;
             }
             checkGameOver();
@@ -268,7 +280,7 @@
             }
         });
 
-        update();
+        gameLoop();
     </script>
 </body>
 </html>
