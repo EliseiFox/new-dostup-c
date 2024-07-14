@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Visibility Polygon with Multiplayer</title>
+    <title>3D Ray Casting with Multiplayer</title>
     <style>
         .open-link-button {
             position: fixed;
@@ -50,6 +50,7 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
+        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
@@ -66,10 +67,12 @@
 
         const width = canvas.width;
         const height = canvas.height;
+
         const BLACK = 'black';
         const YELLOW = 'yellow';
         const RED = 'red';
         const PURPLE = 'purple';
+
         let playerPos = { x: width / 4, y: height / 2 };
         let playerAngle = 0;
         const playerSpeed = 2;
@@ -97,94 +100,53 @@
             redWall
         ];
 
-        function getCorners(obstacle) {
-            return [
-                { x: obstacle.x, y: obstacle.y },
-                { x: obstacle.x + obstacle.w, y: obstacle.y },
-                { x: obstacle.x, y: obstacle.y + obstacle.h },
-                { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }
-            ];
-        }
+        const corners = [];
+        obstacles.forEach(rect => {
+            corners.push({ x: rect.x, y: rect.y });
+            corners.push({ x: rect.x + rect.w, y: rect.y });
+            corners.push({ x: rect.x, y: rect.y + rect.h });
+            corners.push({ x: rect.x + rect.w, y: rect.y + rect.h });
+        });
 
-        function getVisibleVertices(playerPos) {
-            let vertices = [];
-            obstacles.forEach(obstacle => {
-                getCorners(obstacle).forEach(corner => {
-                    let angle = Math.atan2(corner.y - playerPos.y, corner.x - playerPos.x);
-                    vertices.push({ angle, corner });
-                    vertices.push({ angle: angle - 0.00001, corner });
-                    vertices.push({ angle: angle + 0.00001, corner });
-                });
-            });
-            return vertices;
-        }
-
-        function castVisibilityPolygon(playerPos, angle, obstacles) {
+        function rayCasting(playerPos, angle) {
             let x = playerPos.x;
             let y = playerPos.y;
             const dx = Math.cos(angle);
             const dy = Math.sin(angle);
-            let minDistance = maxDistance;
-            obstacles.forEach(obstacle => {
-                const corners = getCorners(obstacle);
-                for (let i = 0; i < corners.length; i++) {
-                    const nextIndex = (i + 1) % corners.length;
-                    const intersection = getIntersection(
-                        playerPos,
-                        { x: playerPos.x + dx * maxDistance, y: playerPos.y + dy * maxDistance },
-                        corners[i],
-                        corners[nextIndex]
-                    );
-                    if (intersection) {
-                        const distance = Math.hypot(intersection.x - playerPos.x, intersection.y - playerPos.y);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                        }
+            for (let distance = 0; distance < maxDistance; distance++) {
+                x += dx;
+                y += dy;
+                if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
+                    return { distance, isCorner: true };
+                }
+                for (let rect of obstacles) {
+                    if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
+                        return { distance, isCorner: false, color: rect.color };
                     }
                 }
-            });
-            return { x: playerPos.x + dx * minDistance, y: playerPos.y + dy * minDistance };
-        }
-
-        function getIntersection(p1, p2, p3, p4) {
-            const denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
-            if (denom === 0) return null;
-            const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom;
-            const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / denom;
-            if (t > 0 && t < 1 && u > 0 && u < 1) {
-                return {
-                    x: p1.x + t * (p2.x - p1.x),
-                    y: p1.y + t * (p2.y - p1.y)
-                };
             }
-            return null;
+            return { distance: maxDistance, isCorner: false, color: null };
         }
 
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            let vertices = getVisibleVertices(playerPos);
-            vertices.sort((a, b) => a.angle - b.angle);
+            const startAngle = playerAngle - viewAngle / 2;
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.beginPath();
-            ctx.moveTo(playerPos.x, playerPos.y);
-            vertices.forEach(vertex => {
-                const visiblePoint = castVisibilityPolygon(playerPos, vertex.angle, obstacles);
-                ctx.lineTo(visiblePoint.x, visiblePoint.y);
-            });
-            ctx.closePath();
-            ctx.fill();
-
-            obstacles.forEach(obstacle => {
-                ctx.fillStyle = obstacle.color || 'grey';
-                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
-            });
+            for (let i = 0; i < numRays; i++) {
+                const rayAngle = startAngle + viewAngle * i / numRays;
+                const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
+                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
+                const wallHeight = height / correctedDistance * 100;
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
+                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+            }
 
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
-            ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
+            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -232,22 +194,14 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            const visiblePoint = castVisibilityPolygon(playerPos, playerAngle, obstacles);
-            obstacles.forEach(obstacle => {
-                if (
-                    visiblePoint.x >= obstacle.x &&
-                    visiblePoint.x <= obstacle.x + obstacle.w &&
-                    visiblePoint.y >= obstacle.y &&
-                    visiblePoint.y <= obstacle.y + obstacle.h &&
-                    obstacle.color === RED
-                ) {
-                    socket.send(JSON.stringify({ action: 'shoot' }));
-                    redWall.color = PURPLE;
-                    setTimeout(() => {
-                        redWall.color = RED;
-                    }, 1000);
-                }
-            });
+            const { distance, color } = rayCasting(playerPos, playerAngle);
+            if (color === RED) {
+                socket.send(JSON.stringify({ action: 'shoot' }));
+                redWall.color = PURPLE;
+                setTimeout(() => {
+                    redWall.color = RED;
+                }, 1000);
+            }
             setTimeout(() => {
                 canShoot = true;
             }, 2000);
@@ -315,7 +269,6 @@
         });
 
         update();
-        gameLoop();
     </script>
 </body>
 </html>
