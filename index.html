@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%; /* Позиционирование по вертикали на половину экрана */
-            left: 50%; /* Позиционирование по горизонтали на половину экрана */
-            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
-            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none; /* Начально скрываем элемент */
+            display: none;
         }
     </style>
 </head>
@@ -50,17 +50,15 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
-        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
         document.addEventListener('keydown', function(event) {
-            // Проверяем нажатую клавишу
             if (event.key === ' ') {
-                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -98,7 +96,7 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall // Красный куб
+            redWall
         ];
 
         const corners = [];
@@ -114,72 +112,57 @@
             let y = playerPos.y;
             const dx = Math.cos(angle);
             const dy = Math.sin(angle);
-            for (let distance = 0; distance < maxDistance; distance++) {
-                x += dx;
-                y += dy;
-                if (corners.some(corner => Math.abs(x - corner.x) < 1 && Math.abs(y - corner.y) < 1)) {
-                    return { distance, isCorner: true };
+            const gridSize = 64; // Assuming grid size of 64 pixels
+
+            while (true) {
+                const stepX = dx > 0 ? Math.floor(x / gridSize) * gridSize + gridSize - x : Math.ceil(x / gridSize) * gridSize - x;
+                const stepY = dy > 0 ? Math.floor(y / gridSize) * gridSize + gridSize - y : Math.ceil(y / gridSize) * gridSize - y;
+                const deltaX = stepX / dx;
+                const deltaY = stepY / dy;
+
+                if (deltaX < deltaY) {
+                    x += stepX;
+                    y += stepX * dy / dx;
+                } else {
+                    x += stepY * dx / dy;
+                    y += stepY;
                 }
+
                 for (let rect of obstacles) {
                     if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
-                        return { distance, isCorner: false, color: rect.color };
+                        return { distance: Math.sqrt((x - playerPos.x) ** 2 + (y - playerPos.y) ** 2), color: rect.color };
                     }
                 }
+
+                if (x < 0 || y < 0 || x > width || y > height) {
+                    break;
+                }
             }
-            return { distance: maxDistance, isCorner: false, color: null };
+
+            return { distance: maxDistance, color: null };
         }
 
         function draw() {
-  ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = BLACK;
+            ctx.fillRect(0, 0, width, height);
 
-  // Calculate the polygons
-  const polygons = [];
-  for (let i = 0; i < cubeCorners.length; i++) {
-    const corner1 = cubeCorners[i];
-    const corner2 = cubeCorners[(i + 1) % cubeCorners.length];
-    const normal = calculateNormal(corner1, corner2);
-    polygons.push({
-      vertices: [corner1, corner2],
-      normal: normal
-    });
-  }
+            const startAngle = playerAngle - viewAngle / 2;
 
-  // Calculate the distances
-  for (let i = 0; i < polygons.length; i++) {
-    const polygon = polygons[i];
-    const distance = calculateDistance(playerPos, polygon.normal);
-    polygon.distance = distance;
-  }
+            for (let i = 0; i < numRays; i++) {
+                const rayAngle = startAngle + viewAngle * i / numRays;
+                const { distance, color } = rayCasting(playerPos, rayAngle);
+                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
+                const wallHeight = height / correctedDistance * 100;
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                ctx.fillStyle = color || `rgb(${shade},${shade},${shade})`;
+                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+            }
 
-  // Create a 3D projection
-  const lines = [];
-  for (let i = 0; i < polygons.length; i++) {
-    const polygon = polygons[i];
-    for (let j = 0; j < polygon.vertices.length; j++) {
-      const vertex1 = polygon.vertices[j];
-      const vertex2 = polygon.vertices[(j + 1) % polygon.vertices.length];
-      const depth1 = polygon.distance;
-      const depth2 = calculateDistance(playerPos, polygon.normal, vertex2);
-      lines.push({
-        x1: vertex1.x,
-        y1: vertex1.y,
-        x2: vertex2.x,
-        y2: vertex2.y,
-        depth1: depth1,
-        depth2: depth2
-      });
-    }
-  }
-
-  // Render the scene
-  ctx.beginPath();
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    ctx.moveTo(line.x1, line.y1);
-    ctx.lineTo(line.x2, line.y2);
-  }
-  ctx.stroke();
-}
+            ctx.fillStyle = YELLOW;
+            ctx.beginPath();
+            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         function update() {
             draw();
@@ -241,17 +224,261 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             } else if (opponentHP <= 0) {
                 displayMessage('Ты победил');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             }
         }
 
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
-            messageContainer.style.display = 'block'; // Показываем элемент сообщений
+            messageContainer.textContent = message.toUpperCase();
+            messageContainer.style.display = 'block';
+        }
+
+        function resetGame() {
+            var messageContainer = document.getElementById('messageContainer');
+            messageContainer.style.display = 'none';
+            playerHP = 3;
+            opponentHP```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Ray Casting with Multiplayer</title>
+    <style>
+        .open-link-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background: black;
+        }
+        #hpDisplay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+        }
+        #messageContainer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            font-size: 30px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="messageContainer"></div>
+    <button class="open-link-button no-select" onclick="openAnotherSite()">Open Site</button>
+    <canvas id="gameCanvas"></canvas>
+    <div id="hpDisplay">HP: 3</div>
+    <script>
+        function openAnotherSite() {
+            window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
+        }
+        document.addEventListener('keydown', function(event) {
+            if (event.key === ' ') {
+                event.preventDefault();
+            }
+        });
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        const BLACK = 'black';
+        const YELLOW = 'yellow';
+        const RED = 'red';
+        const PURPLE = 'purple';
+
+        let playerPos = { x: width / 4, y: height / 2 };
+        let playerAngle = 0;
+        const playerSpeed = 2;
+        const angleSpeed = 0.02;
+        const numRays = 120;
+        const viewAngle = Math.PI / 3;
+        const maxDistance = 800;
+        let playerHP = 3;
+        let opponentHP = 3;
+        let canShoot = true;
+        let lastShotTime = 0;
+
+        let redWall = { x: 200, y: 200, w: 30, h: 30, color: RED };
+
+        const obstacles = [
+            { x: 0, y: 0, w: width, h: 10 },
+            { x: 0, y: height - 10, w: width, h: 10 },
+            { x: 0, y: 0, w: 10, h: height },
+            { x: width - 10, y: 0, w: 10, h: height },
+            { x: 100, y: 100, w: 50, h: 50 },
+            { x: 300, y: 200, w: 60, h: 60 },
+            { x: 150, y: 300, w: 40, h: 40 },
+            { x: 500, y: 150, w: 70, h: 70 },
+            { x: 600, y: 300, w: 40, h: 40 },
+            redWall
+        ];
+
+        const corners = [];
+        obstacles.forEach(rect => {
+            corners.push({ x: rect.x, y: rect.y });
+            corners.push({ x: rect.x + rect.w, y: rect.y });
+            corners.push({ x: rect.x, y: rect.y + rect.h });
+            corners.push({ x: rect.x + rect.w, y: rect.y + rect.h });
+        });
+
+        function rayCasting(playerPos, angle) {
+            let x = playerPos.x;
+            let y = playerPos.y;
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            const gridSize = 64; // Assuming grid size of 64 pixels
+
+            while (true) {
+                const stepX = dx > 0 ? Math.floor(x / gridSize) * gridSize + gridSize - x : Math.ceil(x / gridSize) * gridSize - x;
+                const stepY = dy > 0 ? Math.floor(y / gridSize) * gridSize + gridSize - y : Math.ceil(y / gridSize) * gridSize - y;
+                const deltaX = stepX / dx;
+                const deltaY = stepY / dy;
+
+                if (deltaX < deltaY) {
+                    x += stepX;
+                    y += stepX * dy / dx;
+                } else {
+                    x += stepY * dx / dy;
+                    y += stepY;
+                }
+
+                for (let rect of obstacles) {
+                    if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
+                        return { distance: Math.sqrt((x - playerPos.x) ** 2 + (y - playerPos.y) ** 2), color: rect.color };
+                    }
+                }
+
+                if (x < 0 || y < 0 || x > width || y > height) {
+                    break;
+                }
+            }
+
+            return { distance: maxDistance, color: null };
+        }
+
+        function draw() {
+            ctx.fillStyle = BLACK;
+            ctx.fillRect(0, 0, width, height);
+
+            const startAngle = playerAngle - viewAngle / 2;
+
+            for (let i = 0; i < numRays; i++) {
+                const rayAngle = startAngle + viewAngle * i / numRays;
+                const { distance, color } = rayCasting(playerPos, rayAngle);
+                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
+                const wallHeight = height / correctedDistance * 100;
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                ctx.fillStyle = color || `rgb(${shade},${shade},${shade})`;
+                ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
+            }
+
+            ctx.fillStyle = YELLOW;
+            ctx.beginPath();
+            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function update() {
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        function movePlayer() {
+            if (keys['KeyW']) {
+                playerPos.x += playerSpeed * Math.cos(playerAngle);
+                playerPos.y += playerSpeed * Math.sin(playerAngle);
+            }
+            if (keys['KeyS']) {
+                playerPos.x -= playerSpeed * Math.cos(playerAngle);
+                playerPos.y -= playerSpeed * Math.sin(playerAngle);
+            }
+            if (keys['KeyA']) {
+                playerPos.x += playerSpeed * Math.cos(playerAngle - Math.PI / 2);
+                playerPos.y += playerSpeed * Math.sin(playerAngle - Math.PI / 2);
+            }
+            if (keys['KeyD']) {
+                playerPos.x += playerSpeed * Math.cos(playerAngle + Math.PI / 2);
+                playerPos.y += playerSpeed * Math.sin(playerAngle + Math.PI / 2);
+            }
+            if (keys['ArrowLeft']) {
+                playerAngle -= angleSpeed;
+            }
+            if (keys['ArrowRight']) {
+                playerAngle += angleSpeed;
+            }
+        }
+
+        function shoot() {
+            if (!canShoot) return;
+            canShoot = false;
+            lastShotTime = Date.now();
+            const { distance, color } = rayCasting(playerPos, playerAngle);
+            if (color === RED) {
+                socket.send(JSON.stringify({ action: 'shoot' }));
+                redWall.color = PURPLE;
+                setTimeout(() => {
+                    redWall.color = RED;
+                }, 1000);
+            }
+            setTimeout(() => {
+                canShoot = true;
+            }, 2000);
+        }
+
+        function checkGameOver() {
+            if (playerHP <= 0) {
+                displayMessage('Ты проиграл');
+                setTimeout(resetGame, 3000);
+            } else if (opponentHP <= 0) {
+                displayMessage('Ты победил');
+                setTimeout(resetGame, 3000);
+            }
+        }
+
+        function displayMessage(message) {
+            var messageContainer = document.getElementById('messageContainer');
+            messageContainer.textContent = message.toUpperCase();
+            messageContainer.style.display = 'block';
         }
 
         function resetGame() {
