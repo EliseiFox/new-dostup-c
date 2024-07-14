@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Ray Casting with Multiplayer</title>
+    <title>3D Shadowcasting with Multiplayer</title>
     <style>
         .open-link-button {
             position: fixed;
@@ -32,15 +32,15 @@
         }
         #messageContainer {
             position: fixed;
-            top: 50%; /* Позиционирование по вертикали на половину экрана */
-            left: 50%; /* Позиционирование по горизонтали на половину экрана */
-            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
-            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 20px;
             font-size: 30px;
             text-align: center;
-            display: none; /* Начально скрываем элемент */
+            display: none;
         }
     </style>
 </head>
@@ -50,22 +50,19 @@
     <canvas id="gameCanvas"></canvas>
     <div id="hpDisplay">HP: 3</div>
     <script>
-        // Функция для открытия сайта в новой вкладке по нажатию кнопки
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
         document.addEventListener('keydown', function(event) {
-            // Проверяем нажатую клавишу
             if (event.key === ' ') {
-                // Предотвращаем стандартное поведение браузера (нажатие кнопки)
                 event.preventDefault();
             }
         });
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-
         const width = canvas.width;
         const height = canvas.height;
 
@@ -78,7 +75,6 @@
         let playerAngle = 0;
         const playerSpeed = 2;
         const angleSpeed = 0.02;
-        const numRays = 120;
         const viewAngle = Math.PI / 3;
         const maxDistance = 800;
         let playerHP = 3;
@@ -98,65 +94,104 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall // Красный куб
+            redWall
         ];
 
-        function getCorners(rect) {
-            return [
-                { x: rect.x, y: rect.y },
-                { x: rect.x + rect.w, y: rect.y },
-                { x: rect.x, y: rect.y + rect.h },
-                { x: rect.x + rect.w, y: rect.y + rect.h }
-            ];
-        }
+        function drawVisibilityPolygon(x, y, obstacles) {
+            const points = [];
+            const uniqueAngles = [];
 
-        function getVisibleCorners(playerPos, obstacles) {
-            let corners = [];
-            obstacles.forEach(rect => {
-                corners = corners.concat(getCorners(rect));
-            });
-            corners = corners.filter(corner => {
-                const angle = Math.atan2(corner.y - playerPos.y, corner.x - playerPos.x);
-                return Math.abs(angle - playerAngle) < viewAngle / 2;
-            });
-            return corners;
-        }
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                const corners = [
+                    { x: obstacle.x, y: obstacle.y },
+                    { x: obstacle.x + obstacle.w, y: obstacle.y },
+                    { x: obstacle.x, y: obstacle.y + obstacle.h },
+                    { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }
+                ];
 
-        function getDistance(point1, point2) {
-            return Math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2);
-        }
-
-        function getPolygon(playerPos, corners) {
-            let polygon = [];
-            corners.forEach(corner => {
-                const distance = getDistance(playerPos, corner);
-                polygon.push({ x: corner.x, y: corner.y, distance });
-            });
-            polygon.sort((a, b) => a.distance - b.distance);
-            return polygon;
-        }
-
-        function drawPolygon(polygon) {
-            ctx.beginPath();
-            ctx.moveTo(polygon[0].x, polygon[0].y);
-            for (let i = 1; i < polygon.length; i++) {
-                ctx.lineTo(polygon[i].x, polygon[i].y);
+                for (let j = 0; j < corners.length; j++) {
+                    const angle = Math.atan2(corners[j].y - y, corners[j].x - x);
+                    uniqueAngles.push(angle - 0.00001, angle, angle + 0.00001);
+                }
             }
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.fill();
+
+            uniqueAngles.sort();
+
+            for (let i = 0; i < uniqueAngles.length; i++) {
+                const angle = uniqueAngles[i];
+                const dx = Math.cos(angle);
+                const dy = Math.sin(angle);
+
+                let closestIntersection = null;
+                let minDistance = Infinity;
+
+                for (let j = 0; j < obstacles.length; j++) {
+                    const obstacle = obstacles[j];
+                    const corners = [
+                        { x: obstacle.x, y: obstacle.y },
+                        { x: obstacle.x + obstacle.w, y: obstacle.y },
+                        { x: obstacle.x, y: obstacle.y + obstacle.h },
+                        { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }
+                    ];
+
+                    for (let k = 0; k < corners.length; k++) {
+                        const p1 = corners[k];
+                        const p2 = corners[(k + 1) % corners.length];
+                        const intersection = getIntersection(x, y, x + dx * maxDistance, y + dy * maxDistance, p1.x, p1.y, p2.x, p2.y);
+                        if (intersection) {
+                            const distance = Math.hypot(intersection.x - x, intersection.y - y);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestIntersection = intersection;
+                            }
+                        }
+                    }
+                }
+
+                if (closestIntersection) {
+                    points.push(closestIntersection);
+                }
+            }
+
+            points.sort((a, b) => Math.atan2(a.y - y, a.x - x) - Math.atan2(b.y - y, b.x - x));
+            return points;
+        }
+
+        function getIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+            const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+            if (denom === 0) return null;
+
+            const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+            const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+            if (t > 0 && t < 1 && u > 0 && u < 1) {
+                return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+            }
+            return null;
         }
 
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            const corners = getVisibleCorners(playerPos, obstacles);
-            const polygon = getPolygon(playerPos, corners);
+            const visibilityPolygon = drawVisibilityPolygon(playerPos.x, playerPos.y, obstacles);
 
-            drawPolygon(polygon);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(visibilityPolygon[0].x, visibilityPolygon[0].y);
+            for (let i = 1; i < visibilityPolygon.length; i++) {
+                ctx.lineTo(visibilityPolygon[i].x, visibilityPolygon[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
 
-            // Draw the center point
+            // Draw obstacles
+            for (let obstacle of obstacles) {
+                ctx.fillStyle = obstacle.color || BLACK;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+            }
+
+            // Draw the player
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
@@ -207,13 +242,21 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            const { distance, color } = rayCasting(playerPos, playerAngle);
-            if (color === RED) {
-                socket.send(JSON.stringify({ action: 'shoot' }));
-                redWall.color = PURPLE;
-                setTimeout(() => {
-                    redWall.color = RED;
-                }, 1000);
+            const visibilityPolygon = drawVisibilityPolygon(playerPos.x, playerPos.y, obstacles);
+            for (let point of visibilityPolygon) {
+                const dx = point.x - playerPos.x;
+                const dy = point.y - playerPos.y;
+                const angle = Math.atan2(dy, dx);
+                if (Math.abs(angle - playerAngle) < 0.1) {
+                    if (point.color === RED) {
+                        socket.send(JSON.stringify({ action: 'shoot' }));
+                        redWall.color = PURPLE;
+                        setTimeout(() => {
+                            redWall.color = RED;
+                        }, 1000);
+                        break;
+                    }
+                }
             }
             setTimeout(() => {
                 canShoot = true;
@@ -223,17 +266,17 @@
         function checkGameOver() {
             if (playerHP <= 0) {
                 displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             } else if (opponentHP <= 0) {
                 displayMessage('Ты победил');
-                setTimeout(resetGame, 3000); // Перезагрузка игры через 3 секунды
+                setTimeout(resetGame, 3000);
             }
         }
 
         function displayMessage(message) {
             var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase(); // Выводим текст большими буквами
-            messageContainer.style.display = 'block'; // Показываем элемент сообщений
+            messageContainer.textContent = message.toUpperCase();
+            messageContainer.style.display = 'block';
         }
 
         function resetGame() {
@@ -282,6 +325,7 @@
         });
 
         update();
+        gameLoop();
     </script>
 </body>
 </html>
