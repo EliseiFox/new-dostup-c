@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Ray Casting with Multiplayer</title>
+    <title>3D Visibility Polygon with Multiplayer</title>
     <style>
         .open-link-button {
             position: fixed;
@@ -53,7 +53,6 @@
         function openAnotherSite() {
             window.open('https://458f-212-58-119-152.ngrok-free.app', '_blank');
         }
-
         document.addEventListener('keydown', function(event) {
             if (event.key === ' ') {
                 event.preventDefault();
@@ -67,17 +66,16 @@
 
         const width = canvas.width;
         const height = canvas.height;
-
         const BLACK = 'black';
         const YELLOW = 'yellow';
         const RED = 'red';
         const PURPLE = 'purple';
-
         let playerPos = { x: width / 4, y: height / 2 };
         let playerAngle = 0;
         const playerSpeed = 2;
         const angleSpeed = 0.02;
-        const fov = Math.PI / 3; // Field of view
+        const numRays = 120;
+        const viewAngle = Math.PI / 3;
         const maxDistance = 800;
         let playerHP = 3;
         let opponentHP = 3;
@@ -99,114 +97,91 @@
             redWall
         ];
 
-        function getIntersections(ray, segment) {
-            const r_px = ray.start.x;
-            const r_py = ray.start.y;
-            const r_dx = ray.end.x - ray.start.x;
-            const r_dy = ray.end.y - ray.start.y;
-
-            const s_px = segment.start.x;
-            const s_py = segment.start.y;
-            const s_dx = segment.end.x - segment.start.x;
-            const s_dy = segment.end.y - segment.start.y;
-
-            const r_mag = Math.sqrt(r_dx * r_dx + r_dy * r_dy);
-            const s_mag = Math.sqrt(s_dx * s_dx + s_dy * s_dy);
-
-            if (r_dx / r_mag == s_dx / s_mag && r_dy / r_mag == s_dy / s_mag) {
-                return null;
-            }
-
-            const T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
-            const T1 = (s_px + s_dx * T2 - r_px) / r_dx;
-
-            if (T1 < 0) return null;
-            if (T2 < 0 || T2 > 1) return null;
-
-            return {
-                x: r_px + r_dx * T1,
-                y: r_py + r_dy * T1,
-                distance: T1
-            };
+        function getCorners(obstacle) {
+            return [
+                { x: obstacle.x, y: obstacle.y },
+                { x: obstacle.x + obstacle.w, y: obstacle.y },
+                { x: obstacle.x, y: obstacle.y + obstacle.h },
+                { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }
+            ];
         }
 
-        function getSightPolygon(sightX, sightY) {
-            let points = [];
-            let uniqueAngles = [];
-
+        function getVisibleVertices(playerPos) {
+            let vertices = [];
             obstacles.forEach(obstacle => {
-                const corners = [
-                    { x: obstacle.x, y: obstacle.y },
-                    { x: obstacle.x + obstacle.w, y: obstacle.y },
-                    { x: obstacle.x, y: obstacle.y + obstacle.h },
-                    { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }
-                ];
-
-                corners.forEach(corner => {
-                    const angle = Math.atan2(corner.y - sightY, corner.x - sightX);
-                    uniqueAngles.push(angle - 0.00001, angle, angle + 0.00001);
+                getCorners(obstacle).forEach(corner => {
+                    let angle = Math.atan2(corner.y - playerPos.y, corner.x - playerPos.x);
+                    vertices.push({ angle, corner });
+                    vertices.push({ angle: angle - 0.00001, corner });
+                    vertices.push({ angle: angle + 0.00001, corner });
                 });
             });
-
-            uniqueAngles.forEach(angle => {
-                const dx = Math.cos(angle);
-                const dy = Math.sin(angle);
-
-                const ray = {
-                    start: { x: sightX, y: sightY },
-                    end: { x: sightX + dx * maxDistance, y: sightY + dy * maxDistance }
-                };
-
-                let closestIntersect = null;
-
-                obstacles.forEach(obstacle => {
-                    const segments = [
-                        { start: { x: obstacle.x, y: obstacle.y }, end: { x: obstacle.x + obstacle.w, y: obstacle.y } },
-                        { start: { x: obstacle.x + obstacle.w, y: obstacle.y }, end: { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h } },
-                        { start: { x: obstacle.x + obstacle.w, y: obstacle.y + obstacle.h }, end: { x: obstacle.x, y: obstacle.y + obstacle.h } },
-                        { start: { x: obstacle.x, y: obstacle.y + obstacle.h }, end: { x: obstacle.x, y: obstacle.y } }
-                    ];
-
-                    segments.forEach(segment => {
-                        const intersect = getIntersections(ray, segment);
-                        if (!intersect) return;
-
-                        if (!closestIntersect || intersect.distance < closestIntersect.distance) {
-                            closestIntersect = intersect;
-                        }
-                    });
-                });
-
-                if (!closestIntersect) return;
-
-                points.push(closestIntersect);
-            });
-
-            points.sort((a, b) => Math.atan2(a.y - sightY, a.x - sightX) - Math.atan2(b.y - sightY, b.x - sightX));
-
-            return points;
+            return vertices;
         }
 
-        function draw3D(points) {
-            const sliceWidth = width / points.length;
-            points.forEach((point, i) => {
-                const angle = Math.atan2(point.y - playerPos.y, point.x - playerPos.x) - playerAngle;
-                const distance = Math.sqrt((point.x - playerPos.x) ** 2 + (point.y - playerPos.y) ** 2) * Math.cos(angle);
-                const wallHeight = (height / distance) * 100;
-                const shade = 255 - Math.floor((distance / maxDistance) * 255);
-                ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-                ctx.fillRect(i * sliceWidth, (height / 2) - (wallHeight / 2), sliceWidth, wallHeight);
+        function castVisibilityPolygon(playerPos, angle, obstacles) {
+            let x = playerPos.x;
+            let y = playerPos.y;
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            let minDistance = maxDistance;
+            obstacles.forEach(obstacle => {
+                const corners = getCorners(obstacle);
+                for (let i = 0; i < corners.length; i++) {
+                    const nextIndex = (i + 1) % corners.length;
+                    const intersection = getIntersection(
+                        playerPos,
+                        { x: playerPos.x + dx * maxDistance, y: playerPos.y + dy * maxDistance },
+                        corners[i],
+                        corners[nextIndex]
+                    );
+                    if (intersection) {
+                        const distance = Math.hypot(intersection.x - playerPos.x, intersection.y - playerPos.y);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                        }
+                    }
+                }
             });
+            return { x: playerPos.x + dx * minDistance, y: playerPos.y + dy * minDistance };
+        }
+
+        function getIntersection(p1, p2, p3, p4) {
+            const denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+            if (denom === 0) return null;
+            const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom;
+            const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / denom;
+            if (t > 0 && t < 1 && u > 0 && u < 1) {
+                return {
+                    x: p1.x + t * (p2.x - p1.x),
+                    y: p1.y + t * (p2.y - p1.y)
+                };
+            }
+            return null;
         }
 
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
 
-            const points = getSightPolygon(playerPos.x, playerPos.y);
-            draw3D(points);
+            let vertices = getVisibleVertices(playerPos);
+            vertices.sort((a, b) => a.angle - b.angle);
 
-            // Draw player
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(playerPos.x, playerPos.y);
+            vertices.forEach(vertex => {
+                const visiblePoint = castVisibilityPolygon(playerPos, vertex.angle, obstacles);
+                ctx.lineTo(visiblePoint.x, visiblePoint.y);
+            });
+            ctx.closePath();
+            ctx.fill();
+
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = obstacle.color || 'grey';
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+            });
+
             ctx.fillStyle = YELLOW;
             ctx.beginPath();
             ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
@@ -257,14 +232,22 @@
             if (!canShoot) return;
             canShoot = false;
             lastShotTime = Date.now();
-            const { distance, color } = rayCasting(playerPos, playerAngle);
-            if (color === RED) {
-                socket.send(JSON.stringify({ action: 'shoot' }));
-                redWall.color = PURPLE;
-                setTimeout(() => {
-                    redWall.color = RED;
-                }, 1000);
-            }
+            const visiblePoint = castVisibilityPolygon(playerPos, playerAngle, obstacles);
+            obstacles.forEach(obstacle => {
+                if (
+                    visiblePoint.x >= obstacle.x &&
+                    visiblePoint.x <= obstacle.x + obstacle.w &&
+                    visiblePoint.y >= obstacle.y &&
+                    visiblePoint.y <= obstacle.y + obstacle.h &&
+                    obstacle.color === RED
+                ) {
+                    socket.send(JSON.stringify({ action: 'shoot' }));
+                    redWall.color = PURPLE;
+                    setTimeout(() => {
+                        redWall.color = RED;
+                    }, 1000);
+                }
+            });
             setTimeout(() => {
                 canShoot = true;
             }, 2000);
