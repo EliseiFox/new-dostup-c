@@ -132,35 +132,39 @@
         function draw() {
             ctx.fillStyle = BLACK;
             ctx.fillRect(0, 0, width, height);
-
+        
             const startAngle = playerAngle - viewAngle / 2;
-
+            const columns = [];
+        
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
                 const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
                 const wallHeight = height / correctedDistance * 100;
-
-                // Draw the wall as a curve
-                ctx.beginPath();
-                ctx.moveTo(i * width / numRays, height / 2 - wallHeight / 2);
-                for (let j = 0; j < 10; j++) {
-                    const x = i * width / numRays + j * width / (numRays * 10);
-                    const y = height / 2 - wallHeight / 2 + j * wallHeight / 10;
-                    ctx.lineTo(x, y);
-                }
-                ctx.lineTo((i + 1) * width / numRays, height / 2 - wallHeight / 2);
-                ctx.closePath();
-                ctx.fillStyle = color || (isCorner? YELLOW : `rgb(${255 - Math.floor(distance * 255 / maxDistance)},${255 - Math.floor(distance * 255 / maxDistance)},${255 - Math.floor(distance * 255 / maxDistance)})`);
-                ctx.fill();
+                const shade = 255 - Math.floor(distance * 255 / maxDistance);
+                const columnColor = color || (isCorner? YELLOW : `rgb(${shade},${shade},${shade})`);
+                columns.push({
+                    x: i * width / numRays,
+                    y: height / 2 - wallHeight / 2,
+                    w: width / numRays,
+                    h: wallHeight,
+                    color: columnColor
+                });
             }
 
-            // Draw the center point
-            ctx.fillStyle = YELLOW;
-            ctx.beginPath();
-            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
-            ctx.fill();
-        }
+    ctx.beginPath();
+    for (const column of columns) {
+        ctx.fillStyle = column.color;
+        ctx.fillRect(column.x, column.y, column.w, column.h);
+    }
+    ctx.fill();
+
+    // Draw the center point
+    ctx.fillStyle = YELLOW;
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
+    ctx.fill();
+}
 
         function update() {
             draw();
@@ -196,7 +200,7 @@
             }
             if (keys['ArrowLeft']) {
                 playerAngle -= angleSpeed;
-           }
+            }
             if (keys['ArrowRight']) {
                 playerAngle += angleSpeed;
             }
@@ -208,7 +212,7 @@
             lastShotTime = Date.now();
             const { distance, color } = rayCasting(playerPos, playerAngle);
             if (color === RED) {
-                socket.send(JSON.stringify({ action: 'hoot' }));
+                socket.send(JSON.stringify({ action: 'shoot' }));
                 redWall.color = PURPLE;
                 setTimeout(() => {
                     redWall.color = RED;
@@ -242,7 +246,7 @@
             opponentHP = 3;
             playerPos = { x: width / 4, y: height / 2 };
             playerAngle = 0;
-            socket.send(JSON.stringify({ action: 'eset' }));
+            socket.send(JSON.stringify({ action: 'reset' }));
         }
 
         function gameLoop() {
@@ -264,11 +268,11 @@
             const data = JSON.parse(event.data);
             redWall.x = data.wallPosition.x;
             redWall.y = data.wallPosition.y;
-            if (data.playerHP!== undefined) {
+            if (data.playerHP !== undefined) {
                 playerHP = data.playerHP;
                 document.getElementById('hpDisplay').innerText = `HP: ${playerHP}`;
             }
-            if (data.opponentHP!== undefined) {
+            if (data.opponentHP !== undefined) {
                 opponentHP = data.opponentHP;
             }
             checkGameOver();
@@ -280,7 +284,77 @@
             }
         });
 
-        gameLoop();
-    </script>
-</body>
-</html>
+
+
+server
+
+
+const WebSocket = require('ws');
+
+const wss = new WebSocket.Server({ port: 5555 });
+
+let positions = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
+let hps = [3, 3];
+let clients = [];
+
+wss.on('connection', (ws) => {
+    if (clients.length >= 2) {
+        ws.close(1000, "Server full");
+        return;
+    }
+
+    const clientIndex = clients.length;
+    clients.push(ws);
+
+    ws.on('message', (message) => {
+        const data = JSON.parse(message);
+        if (data.position) {
+            positions[clientIndex] = data.position;
+            broadcastPositions();
+        }
+        if (data.action === 'shoot') {
+            hps[1 - clientIndex] -= 1;
+            broadcastHP();
+        }
+        if (data.action === 'reset') {
+            hps = [3, 3];
+            positions = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
+            broadcastPositions();
+            broadcastHP();
+        }
+    });
+
+    ws.on('close', () => {
+        clients = clients.filter((client) => client !== ws);
+        if (clientIndex === 0 && clients[0]) {
+            clients[0].send(JSON.stringify({ wallPosition: { x: 0, y: 0 } }));
+        } else if (clientIndex === 1 && clients[1]) {
+            clients[1].send(JSON.stringify({ wallPosition: { x: 0, y: 0 } }));
+        }
+    });
+});
+
+function broadcastPositions() {
+    clients.forEach((client, index) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                wallPosition: positions[1 - index],
+                playerHP: hps[index],
+                opponentHP: hps[1 - index]
+            }));
+        }
+    });
+}
+
+function broadcastHP() {
+    clients.forEach((client, index) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                playerHP: hps[index],
+                opponentHP: hps[1 - index]
+            }));
+        }
+    });
+}
+
+console.log('WebSocket server is running on ws://localhost:5555');
