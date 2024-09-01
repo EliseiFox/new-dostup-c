@@ -5,16 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Ray Casting with Multiplayer</title>
     <style>
-        .open-link-button {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
         body {
             margin: 0;
             overflow: hidden;
@@ -23,73 +13,16 @@
             display: block;
             background: black;
         }
-        #hpDisplay {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-size: 20px;
-        }
-        #messageContainer {
-            position: fixed;
-            top: 50%; /* Позиционирование по вертикали на половину экрана */
-            left: 50%; /* Позиционирование по горизонтали на половину экрана */
-            transform: translate(-50%, -50%); /* Центрирование по обеим осям */
-            background-color: rgba(0, 0, 0, 0.8); /* Полупрозрачный фон */
-            color: white;
-            padding: 20px;
-            font-size: 30px;
-            text-align: center;
-            display: none; /* Начально скрываем элемент */
-        }
-        .mobile-controls {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            justify-content: space-around;
-        }
-        .mobile-button {
-            width: 60px;
-            height: 60px;
-            background-color: rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: black;
-            user-select: none;
-        }
     </style>
 </head>
-<body>
-    <div id="messageContainer"></div>
-    <button class="open-link-button no-select" onclick="openAnotherSite()">Open Site</button>
-    <canvas id="gameCanvas"></canvas>
-    <div id="hpDisplay">HP: 3</div>
-    <div id="mobileControls" class="mobile-controls">
-        <div class="mobile-button" id="moveUp">↑</div>
-        <div class="mobile-button" id="moveLeft">←</div>
-        <div class="mobile-button" id="moveRight">→</div>
-        <div class="mobile-button" id="moveDown">↓</div>
-        <div class="mobile-button" id="shoot">Shoot</div>
-        <div class="mobile-button" id="left">q</div>
-        <div class="mobile-button" id="right">e</div>
-    </div>
-    <script>
-        function openAnotherSite() {
-            window.open('https://6021-212-58-119-152.ngrok-free.app', '_blank');
-        }
-        
-        document.addEventListener('keydown', function(event) {
-            if (event.key === ' ') {
-                event.preventDefault();
-            }
-        });
+<a href="https://013a-212-58-119-152.ngrok-free.app" target="_blank" id="new-tab-link">Open in new tab</a>
 
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("new-tab-link").click();
+  });
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -101,19 +34,14 @@
         const BLACK = 'black';
         const YELLOW = 'yellow';
         const RED = 'red';
-        const PURPLE = 'purple';
 
         let playerPos = { x: width / 4, y: height / 2 };
         let playerAngle = 0;
         const playerSpeed = 2;
         const angleSpeed = 0.02;
-        const numRays = 60;
+        const numRays = 120;
         const viewAngle = Math.PI / 3;
         const maxDistance = 800;
-        let playerHP = 3;
-        let opponentHP = 3;
-        let canShoot = true;
-        let lastShotTime = 0;
 
         let redWall = { x: 200, y: 200, w: 30, h: 30, color: RED };
 
@@ -127,7 +55,7 @@
             { x: 150, y: 300, w: 40, h: 40 },
             { x: 500, y: 150, w: 70, h: 70 },
             { x: 600, y: 300, w: 40, h: 40 },
-            redWall
+            redWall // Красный куб
         ];
 
         const corners = [];
@@ -167,17 +95,11 @@
             for (let i = 0; i < numRays; i++) {
                 const rayAngle = startAngle + viewAngle * i / numRays;
                 const { distance, isCorner, color } = rayCasting(playerPos, rayAngle);
-                const correctedDistance = distance * Math.cos(rayAngle - playerAngle);
-                const wallHeight = height / correctedDistance * 100;
+                const wallHeight = height * (1 - Math.sqrt(distance / maxDistance));
                 const shade = 255 - Math.floor(distance * 255 / maxDistance);
                 ctx.fillStyle = color || (isCorner ? YELLOW : `rgb(${shade},${shade},${shade})`);
                 ctx.fillRect(i * width / numRays, height / 2 - wallHeight / 2, width / numRays, wallHeight);
             }
-
-            ctx.fillStyle = YELLOW;
-            ctx.beginPath();
-            ctx.arc(width / 2, height / 2, 5, 0, Math.PI * 2);
-            ctx.fill();
         }
 
         function update() {
@@ -220,49 +142,6 @@
             }
         }
 
-        function shoot() {
-            if (!canShoot) return;
-            canShoot = false;
-            lastShotTime = Date.now();
-            const { distance, color } = rayCasting(playerPos, playerAngle);
-            if (color === RED) {
-                socket.send(JSON.stringify({ action: 'shoot' }));
-                redWall.color = PURPLE;
-                setTimeout(() => {
-                    redWall.color = RED;
-                }, 1000);
-            }
-            setTimeout(() => {
-                canShoot = true;
-            }, 2000);
-        }
-
-        function checkGameOver() {
-            if (playerHP <= 0) {
-                displayMessage('Ты проиграл');
-                setTimeout(resetGame, 3000);
-            } else if (opponentHP <= 0) {
-                displayMessage('Ты победил');
-                setTimeout(resetGame, 3000);
-            }
-        }
-
-        function displayMessage(message) {
-            var messageContainer = document.getElementById('messageContainer');
-            messageContainer.textContent = message.toUpperCase();
-            messageContainer.style.display = 'block';
-        }
-
-        function resetGame() {
-            var messageContainer = document.getElementById('messageContainer');
-            messageContainer.style.display = 'none';
-            playerHP = 3;
-            opponentHP = 3;
-            playerPos = { x: width / 4, y: height / 2 };
-            playerAngle = 0;
-            socket.send(JSON.stringify({ action: 'reset' }));
-        }
-
         function gameLoop() {
             movePlayer();
             draw();
@@ -276,63 +155,14 @@
             }
         }
 
-        const socket = new WebSocket('wss://6021-212-58-119-152.ngrok-free.app');
+        const socket = new WebSocket('wss://humble-space-yodel-wrx64rqj775cvgwj-5555.app.github.dev/');
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             redWall.x = data.wallPosition.x;
             redWall.y = data.wallPosition.y;
-            if (data.playerHP !== undefined) {
-                playerHP = data.playerHP;
-                document.getElementById('hpDisplay').innerText = `HP: ${playerHP}`;
-            }
-            if (data.opponentHP !== undefined) {
-                opponentHP = data.opponentHP;
-            }
-            checkGameOver();
         };
 
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                shoot();
-            }
-        });
-
-        function detectMobile() {
-            return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
-        function requestFullScreen() {
-            if (canvas.requestFullscreen) {
-                canvas.requestFullscreen();
-            } else if (canvas.mozRequestFullScreen) { // Firefox
-                canvas.mozRequestFullScreen();
-            } else if (canvas.webkitRequestFullscreen) { // Chrome, Safari and Opera
-                canvas.webkitRequestFullscreen();
-            } else if (canvas.msRequestFullscreen) { // IE/Edge
-                canvas.msRequestFullscreen();
-            }
-        }
-
-        if (detectMobile()) {
-            requestFullScreen();
-            document.getElementById('mobileControls').style.display = 'flex';
-
-            document.getElementById('moveUp').addEventListener('touchstart', () => keys['KeyW'] = true);
-            document.getElementById('moveUp').addEventListener('touchend', () => keys['KeyW'] = false);
-            document.getElementById('moveLeft').addEventListener('touchstart', () => keys['KeyA'] = true);
-            document.getElementById('moveLeft').addEventListener('touchend', () => keys['KeyA'] = false);
-            document.getElementById('moveRight').addEventListener('touchstart', () => keys['KeyD'] = true);
-            document.getElementById('moveRight').addEventListener('touchend', () => keys['KeyD'] = false);
-            document.getElementById('moveDown').addEventListener('touchstart', () => keys['KeyS'] = true);
-            document.getElementById('moveDown').addEventListener('touchend', () => keys['KeyS'] = false);
-            document.getElementById('left').addEventListener('touchstart', () => keys['ArrowLeft'] = true);
-            document.getElementById('left').addEventListener('touchend', () => keys['ArrowLeft'] = false);
-            document.getElementById('right').addEventListener('touchstart', () => keys['ArrowRight'] = true);
-            document.getElementById('right').addEventListener('touchend', () => keys['ArrowRight'] = false);
-            document.getElementById('shoot').addEventListener('touchstart', () => shoot());
-        }
-        update();
         gameLoop();
     </script>
 </body>
